@@ -84,3 +84,32 @@ mass
 *.blg
 *.toc
 *.ppm*
+
+# src files
+*.a
+qcc
+*.d
+*.dSYM
+*.log~
+Makefile.tests
+qplot
+draw_get.h
+draw_json.h
+bview
+# ast
+grammar
+grammar.h
+# kdt
+kdtquery
+xyz2kdt
+
+# darcsit/
+codeblock.c
+codeblock
+lex.yy.c
+literate-c
+literate-c.c
+urldecode
+pagemagic
+sanitize
+
