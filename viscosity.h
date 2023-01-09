@@ -156,6 +156,7 @@ static double residual_viscosity (scalar * a, scalar * b, scalar * resl,
 	maxres = fabs (res.x[]);
     }
 #endif
+  fprintf(ferr, "visc: maxres=%g\n", maxres);
   return maxres;
 }
 

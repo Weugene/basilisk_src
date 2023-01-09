@@ -2,6 +2,7 @@
 double timestep (const face vector u, double dtmax)
 {
   static double previous = 0.;
+  double DTMAX = dtmax;
   dtmax /= CFL;
   foreach_face(reduction(min:dtmax))
     if (u.x[] != 0.) {
@@ -17,6 +18,8 @@ double timestep (const face vector u, double dtmax)
   dtmax *= CFL;
   if (dtmax > previous)
     dtmax = (previous + 0.1*dtmax)/1.1;
+  if (dtmax > DTMAX) dtmax=DTMAX;//Weugene correction
+  fprintf(ferr, "TIMEMAX: not conv dtmax=%g, conv DTMAX=%g\n", DTMAX, dtmax);
   previous = dtmax;
   return dtmax;
 }

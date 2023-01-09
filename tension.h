@@ -14,7 +14,9 @@ the interface mean curvature. */
 
 #include "iforce.h"
 #include "curvature.h"
-
+#ifdef DEBUG_MODE_TENSION
+    scalar my_kappa[];
+#endif
 /**
 The surface tension coefficient is associated to each VOF tracer. */
 
@@ -90,5 +92,8 @@ event acceleration (i++)
 	curvature (f, phi, f.sigma, add = false);
 	f.phi = phi;
       }
+#ifdef DEBUG_MODE_TENSION
+      foreach() my_kappa[] = phi[];//Weugene: added \sigma\kappa
+#endif
     }
 }
