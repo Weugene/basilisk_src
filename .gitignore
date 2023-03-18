@@ -77,3 +77,14 @@ urldecode
 pagemagic
 sanitize
 bview.log~
+
+# basilisk execution files
+Makefile.deps
+config
+page2html
+ppm2gif
+ppm2mp4
+ppm2mpeg
+ppm2ogv
+runtest
+sequence
