@@ -80,13 +80,5 @@ sanitize
 bview.log~
 
 # basilisk execution files
-config
-page2html
-ppm2gif
-ppm2mp4
-ppm2mpeg
-ppm2ogv
-runtest
-sequence
 bview2D
 bview3D
