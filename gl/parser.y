@@ -70,8 +70,8 @@ static void yyerror (char ** input, Allocator * alloc,
 		     Node ** root, char const *);
 %}
 
+%param { Allocator * alloc }
 %param {char ** input}
-%param {Allocator * alloc}
 %parse-param {Node ** root}
 %define api.pure full
 %define api.value.type {Node *}
