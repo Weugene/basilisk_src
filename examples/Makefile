@@ -1,5 +1,5 @@
 # the default CFLAGS are set in $(BASILISK)/config
-CFLAGS += -O2 -fopenmp
+CFLAGS += -O2 #-fopenmp # Mac OS doesn't support OpenMP: http://basilisk.fr/sandbox/INSTALL_MACOS
 
 all: check
 
