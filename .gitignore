@@ -70,7 +70,6 @@ xyz2kdt
 codeblock
 lex.yy.c
 literate-c
-parser.tab.c
 urldecode
 pagemagic
 sanitize
