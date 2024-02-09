@@ -62,7 +62,6 @@ draw_json.h
 bview
 # ast
 grammar
-grammar.h
 # kdt
 kdtquery
 xyz2kdt
