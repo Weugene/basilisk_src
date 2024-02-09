@@ -8,6 +8,7 @@ CC99 = gcc -std=c99 -Wno-unused-result -Wno-unused-function
 
 # other useful (non-standard) flags
 CFLAGS += -g -Wall -pipe
+# x86_64-apple-darwin -I/opt/local/include/ -lglfw -lGLEW -framework OpenGL
 
 # if you have valgrind, otherwise comment this out
 # VALGRIND = valgrind -q --tool=memcheck \
@@ -34,8 +35,8 @@ CHECKSUM = shasum -c --status
 OPENGLIBS = -lfb_dumb
 CFLAGS += -DDUMBGL
 
-# OPENGLIBS = -lfb_glx -lGLU -lGLEW -lGL -lX11
-# OPENGLIBS = -L/opt/local/lib/ -lfb_osmesa -lGLU -lOSMesa 
+#OPENGLIBS = -lfb_glx -lGLU -lGLEW -lGL -lX11
+#OPENGLIBS = -L/opt/local/lib/ -lfb_osmesa -lGLU -lOSMesa 
 
 # Compiler and libraries to use with CADNA.
 # See [README.cadna]() for more documentation.

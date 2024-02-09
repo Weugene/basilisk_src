@@ -54,7 +54,7 @@ postproc.c: postproc.lex
 	flex -P post -o postproc.c postproc.lex
 
 bview2D: qcc bview.c draw_get.h draw_json.h bview.s
-	qcc $(CFLAGS) -DDUMBGL -autolink bview.c -o bview2D -lfb_dumb -lm
+	qcc $(CFLAGS) -DDUMBGL -autolink bview.c -o bview2D -lfb_dumb -lm -lglutils
 
 bview3D: qcc bview.c draw_get.h draw_json.h bview.s
 	qcc $(CFLAGS) -DDUMBGL -autolink -grid=octree bview.c -o bview3D -lfb_dumb -lm
