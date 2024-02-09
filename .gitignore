@@ -73,7 +73,12 @@ codeblock
 lex.yy.c
 literate-c
 literate-c.c
+parser.tab.c
 urldecode
 pagemagic
 sanitize
 bview.log~
+
+# basilisk execution files
+bview2D
+bview3D
