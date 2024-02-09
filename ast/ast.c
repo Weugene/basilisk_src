@@ -337,8 +337,27 @@ static void ast_print_internal (Ast * n, FILE * fp, int sym, File * file)
       fputs (r->before, fp);
       update_file_line (r->before, file);
     }
-    for (Ast ** c = n->child; *c; c++)
-      ast_print_internal (*c, fp, sym, file);
+
+    /** 
+    Ignore dimensioned constant expressions e.g. `1.23
+    [1,-1]`, `(2.*3 + 4.)[0,1]` etc. */
+    
+    if (n->sym == sym_array_access && n->child[2] &&
+	ast_evaluate_constant_expression (n->child[0]) < DBL_MAX)
+      ast_print_internal (n->child[0], fp, sym, file);
+
+    /**
+    Ignore the values of optional parameters. */
+
+    else if (ast_schema (n, sym_parameter_declaration,
+			 3, sym_initializer))
+      for (int i = 0; i < 2; i++)
+	ast_print_internal (n->child[i], fp, sym, file);
+    
+    else
+      for (Ast ** c = n->child; *c; c++)
+	ast_print_internal (*c, fp, sym, file);
+    
     if (r && r->after) {
       fputs (r->after, fp);
       file->line += count_lines (r->after);
@@ -351,7 +370,7 @@ void ast_print (Ast * n, FILE * fp, int sym)
   ast_print_internal (n, fp, sym, &(File){0});
 }
 
-char * ast_str_append (Ast * n, char * s)
+char * ast_str_append (const Ast * n, char * s)
 {
   AstTerminal * t = ast_terminal (n);
   if (t) {
@@ -701,18 +720,24 @@ AstRoot * ast_parse_file (FILE * fp, AstRoot * parent)
   return root;
 }
 
+/**
+This is to ignore "face ", "vertex " and "symmetric " typedef prefixes. */
+
+static const char * ignore_prefixes (const char * identifier)
+{
+  if (!strncmp (identifier, "face ", 5))
+    return identifier + 5;
+  else if (!strncmp (identifier, "vertex ", 7))
+    return identifier + 7;
+  else if (!strncmp (identifier, "symmetric ", 10))
+    return identifier + 10;
+  return identifier;
+}
+
 Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier,
 					  const Ast * start, const Ast * end)
 {
-  /**
-  This is to ignore "face ", "vertex " and "symmetric " typedef prefixes. */
-
-  const char * s = strstr (identifier, "face ");
-  if (s == identifier) identifier += strlen ("face ");
-  else if ((s = strstr (identifier, "vertex ")) == identifier)
-    identifier += strlen ("vertex ");
-  else if ((s = strstr (identifier, "symmetric ")) == identifier)
-    identifier += strlen ("symmetric ");
+  identifier = ignore_prefixes (identifier);
   
   Ast ** d;
   int i = 0;
@@ -759,7 +784,10 @@ Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier
 
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier)
 {
-  return ast_identifier_declaration_from_to (stack, identifier, NULL, NULL);
+  Ast ** n = fast_stack_find (stack, identifier);
+  if (!n)
+    n = fast_stack_find (stack, ignore_prefixes (identifier));
+  return n ? *n : NULL;
 }
 
 char * str_append_realloc (char * src, ...)

@@ -169,6 +169,7 @@ postfix_initializer
 	
 array_access
         : postfix_expression '[' ']' /* Basilisk C extension */
+	| postfix_expression '[' '*' ']' /* Basilisk C extension */
         | postfix_expression '[' expression ']'
 	;
 	
@@ -200,8 +201,7 @@ unary_expression
 	| SIZEOF unary_expression
 	| SIZEOF '(' type_name ')'
 	| ALIGNOF '(' type_name ')'
-	| NEW_FIELD /* Basilisk C extension */
-	| NEW_FIELD '[' postfix_expression ']' /* Basilisk C extension */
+	| new_field /* Basilisk C extension */
 	;
 
 unary_operator
@@ -510,6 +510,7 @@ parameter_list
 
 parameter_declaration
 	: declaration_specifiers declarator
+	| declaration_specifiers declarator '=' initializer /* Basilisk C extension */
 	| declaration_specifiers abstract_declarator
 	| declaration_specifiers
 	;
@@ -794,6 +795,11 @@ external_foreach_dimension
 
 attribute
         : generic_identifier '{' struct_declaration_list '}'
+	;
+
+new_field
+        : NEW_FIELD
+	| NEW_FIELD '[' postfix_expression ']'
 	;
 
 root

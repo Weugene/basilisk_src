@@ -3,7 +3,7 @@
 int main() {
   origin (-0.5, -0.5);
   init_grid (8);
-  DT = 1.;
+  DT = 1. [0,1];
   TOLERANCE = 1e-7;
   stokes = true;
   run();

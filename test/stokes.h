@@ -4,6 +4,8 @@
 These functions return the shape of a third-order Stokes wave with the
 wavenumber and steepness given by the parameters $ak$ and $k_$. */
 
+extern double k_, h_, g_, ak;
+
 double wave (double x, double y)
 {
   double a_ = ak/k_;

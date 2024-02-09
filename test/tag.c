@@ -3,6 +3,7 @@
 
 int main()
 {
+  size (1.[0]);
   init_grid (64);
   X0 = Y0 = -0.5;
   scalar t[];

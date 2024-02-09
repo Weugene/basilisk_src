@@ -195,13 +195,10 @@ static void relax_nh (scalar * phil, scalar * rhsl, int lev, void * data)
     
     double n = 0.;
     foreach_dimension() {
-      double pg;
-      hpg (pg, phi, 0)
-	n -= pg;
-      end_hpg (0);
-      hpg (pg, phi, 1)
-	n += pg;
-      end_hpg (1);
+      hpg (pg, phi, 0,
+	   n -= pg);
+      hpg (pg, phi, 1,
+	   n += pg);
     }
     n *= theta_H*sq(dt);
 
@@ -232,10 +229,8 @@ static double residual_nh (scalar * phil, scalar * rhsl,
   face vector g = new face vector[nl];
   foreach_face() {
     double pgh = theta_H*a_baro (eta, 0);
-    double pg;
-    hpg (pg, phi, 0)
-      g.x[] = - 2.*(pg + hf.x[]*pgh);
-    end_hpg (0);
+    hpg (pg, phi, 0,
+	 g.x[] = - 2.*(pg + hf.x[]*pgh));
   }
 
   foreach (reduction(max:maxres)) {
@@ -395,12 +390,10 @@ event pressure (i++)
   face vector su[];
   foreach_face() {
     su.x[] = 0.;
-    double pg;
-    hpg (pg, phi, 0) {
-      ha.x[] += pg;
-      su.x[] -= pg;
-      hu.x[] += theta_H*dt*pg;
-    } end_hpg (0);
+    hpg (pg, phi, 0,
+	 ha.x[] += pg;
+	 su.x[] -= pg;
+	 hu.x[] += theta_H*dt*pg );
   }
 
   /**

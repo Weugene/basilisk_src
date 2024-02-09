@@ -18,13 +18,21 @@ VALGRIND = valgrind -q --tool=memcheck --leak-check=full
 # if gnuplot supports pngcairo, otherwise comment this out
 PNG = pngcairo
 
+# Posix Awk
+AWK = awk
+
+# configuration for python plots
+PYTHON_PLOT = MPLBACKEND=agg python3
+
 # configuration for python modules (requires swig)
 MDFLAGS = -fpic
 PYTHONINCLUDE = /usr/include/python2.7
 
-# OpenGL libraries
-# OPENGLIBS = -lfb_osmesa -lGLU -lOSMesa
-OPENGLIBS = -lfb_glx -lGLU -lGLEW -lGL -lX11
+# "OpenGL" libraries
+
+OPENGLIBS = -lfb_tiny
+# OPENGLIBS = -lfb_osmesa -lOSMesa
+# OPENGLIBS = -lfb_glx -lGLEW -lGL -lX11
 
 # Compiler and libraries to use with CADNA.
 # See [README.cadna]() for more documentation.

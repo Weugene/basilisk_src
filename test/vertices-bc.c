@@ -27,14 +27,14 @@ int main()
   omega[top] = 0.;
   omega[bottom] = 0.;
 
-  foreach_vertex()
-    omega[] = 1.0;
-
   f.n[left] = 0.;
   f.n[right] = 0.;
   f.n[top] = 0.;
   f.n[bottom] = 0.;
-  
+
+  foreach_vertex()
+    omega[] = 1.0;
+
   foreach_face()
     f.x[] = 1.;
 

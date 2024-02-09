@@ -546,17 +546,21 @@ void reset (void * alist, double val)
 
 static double periodic_bc (Point point, Point neighbor, scalar s, void * data);
 
-static inline bool is_vertex_scalar (scalar s)
-{
-  foreach_dimension()
-    if (s.d.x != -1)
-      return false;
-  return true;
-}
-
 static void box_boundary_level (const Boundary * b, scalar * scalars, int l)
 {
+  extern double (* default_scalar_bc[]) (Point, Point, scalar, void *);
   disable_fpe (FE_DIVBYZERO|FE_INVALID);
+  for (int d = 0; d < 2*dimension; d++)
+    if (default_scalar_bc[d] == periodic_bc)
+      for (scalar s in scalars)
+	if (!is_constant(s) && s.block > 0) {
+	  if (is_vertex_scalar (s))
+	    s.boundary[d] = s.boundary_homogeneous[d] = NULL;
+	  else if (s.face) {
+	    vector v = s.v;
+	    v.x.boundary[d] = v.x.boundary_homogeneous[d] = NULL;
+	  }
+	}
   for (int bghost = 1; bghost <= BGHOSTS; bghost++)
     for (int d = 0; d < 2*dimension; d++) {
 
@@ -579,8 +583,6 @@ static void box_boundary_level (const Boundary * b, scalar * scalars, int l)
 	}
       
       if (list) {
-	extern double (* default_scalar_bc[]) (Point, Point, scalar, void *);
-	if (default_scalar_bc[d] != periodic_bc)
 	foreach_boundary_dir (l, d) {
 	  scalar s, sb;
 	  for (s,sb in list,listb) {
@@ -799,37 +801,37 @@ int mpi_dims[dimension], mpi_coords[dimension];
 #define _K     (point.k - GHOSTS + mpi_coords[2]*(1 << point.level))
 #endif
 
-struct _locate { double x, y, z; };
 
-Point locate (struct _locate p)
+
+Point locate (double xp = 0, double yp = 0, double zp = 0)
 {
   Point point = {0};
   point.level = -1, point.n = 1 << depth();
 #if _MPI
-  point.i = (p.x - X0)/L0*point.n*mpi_dims[0] + GHOSTS - mpi_coords[0]*point.n;
+  point.i = (xp - X0)/L0*point.n*mpi_dims[0] + GHOSTS - mpi_coords[0]*point.n;
   if (point.i < GHOSTS || point.i >= point.n + GHOSTS)
     return point;
 #if dimension >= 2
-  point.j = (p.y - Y0)/L0*point.n*mpi_dims[0] + GHOSTS - mpi_coords[1]*point.n;
+  point.j = (yp - Y0)/L0*point.n*mpi_dims[0] + GHOSTS - mpi_coords[1]*point.n;
   if (point.j < GHOSTS || point.j >= point.n + GHOSTS)
     return point;
 #endif
 #if dimension >= 3
-  point.k = (p.z - Z0)/L0*point.n*mpi_dims[0] + GHOSTS - mpi_coords[2]*point.n;
+  point.k = (zp - Z0)/L0*point.n*mpi_dims[0] + GHOSTS - mpi_coords[2]*point.n;
   if (point.k < GHOSTS || point.k >= point.n + GHOSTS)
     return point;
 #endif  
 #else // !_MPI
-  point.i = (p.x - X0)/L0*point.n + GHOSTS;
+  point.i = (xp - X0)/L0*point.n + GHOSTS;
   if (point.i < GHOSTS || point.i >= point.n + GHOSTS)
     return point;
 #if dimension >= 2
-  point.j = (p.y - Y0)/L0*point.n + GHOSTS;
+  point.j = (yp - Y0)/L0*point.n + GHOSTS;
   if (point.j < GHOSTS || point.j >= point.n + GHOSTS)
     return point;
 #endif
 #if dimension >= 3
-  point.k = (p.z - Z0)/L0*point.n + GHOSTS;
+  point.k = (zp - Z0)/L0*point.n + GHOSTS;
   if (point.k < GHOSTS || point.k >= point.n + GHOSTS)
     return point;
 #endif  
@@ -840,15 +842,12 @@ Point locate (struct _locate p)
  
 #include "multigrid-common.h"
 
-struct Dimensions {
-  int nx, ny, nz;
-};
- 
-void dimensions (struct Dimensions p)
+void dimensions (int nx = 0, int ny = 0, int nz = 0)
 {
 #if _MPI
+  int p[] = {nx, ny, nz};
   for (int i = 0; i < dimension; i++)
-    mpi_dims[i] = (&p.nx)[i];
+    mpi_dims[i] = p[i];
 #endif
 }
 

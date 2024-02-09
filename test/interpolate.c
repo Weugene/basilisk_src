@@ -6,6 +6,7 @@ scalar v[];
 
 int main (int argc, char ** argv)
 {
+  size (1.[0]);
   origin (-0.5, -0.5);
   for (int n = 8; n <= 64; n *= 2) {
     init_grid (n);

@@ -15,6 +15,7 @@ a[left]   = dirichlet (solution(x));
 
 int main (int argc, char ** argv)
 {
+  size (1.[0]);
   origin (-0.5, -0.5);
 
   for (int depth = 5; depth <= 8; depth++) {

@@ -12,8 +12,7 @@ Scardovelli. */
 #include "geometry.h"
 #if dimension == 1
 coord mycs (Point point, scalar c) {
-  coord n = {1.};
-  return n;
+  return (coord){sign(c[-1] - c[1])};
 }
 #elif dimension == 2
 # include "myc2d.h"
@@ -118,20 +117,12 @@ which are inside the interface.
 
 ![Volume and surface fractions](/src/figures/fractions.svg) */
 
-struct Fractions {
-  vertex scalar Phi; // compulsory
-  scalar c;          // compulsory
-  face vector s;     // optional
-  double val;        // optional (default zero)
-};
-
 trace
-void fractions (struct Fractions a)
+void fractions (vertex scalar Phi, scalar c,
+		face vector s = {0}, double val = 0.)
 {
-  vertex scalar Phi = a.Phi;
-  scalar c = a.c;
-  face vector s = automatic (a.s);
-  double val = a.val;
+#if dimension > 1
+  face vector as = automatic (s);
   
   /**
   We store the positions of the intersections of the surface with the
@@ -143,7 +134,7 @@ void fractions (struct Fractions a)
   vector p[];
 #else // dimension == 2
   vector p;
-  p.x = s.y; p.y = s.x;
+  p.x = as.y; p.y = as.x;
 #endif
   
   /**
@@ -199,7 +190,7 @@ void fractions (struct Fractions a)
   foreach_dimension()
     p.x.dirty = false;
   
-  scalar s_x = s.x, s_y = s.y, s_z = s.z;
+  scalar s_x = as.x, s_y = as.y, s_z = as.z;
   foreach_face(z,x,y)
 #else // dimension == 2
   scalar s_z = c;
@@ -308,11 +299,11 @@ void fractions (struct Fractions a)
     coord n;
     double nn = 0.;
     foreach_dimension(3) {
-      n.x = s.x[] - s.x[1];
+      n.x = as.x[] - as.x[1];
       nn += fabs(n.x);
     }
     if (nn == 0.)
-      c[] = s.x[];
+      c[] = as.x[];
     else {
       foreach_dimension(3)
 	n.x /= nn;
@@ -336,7 +327,7 @@ void fractions (struct Fractions a)
       Finally we compute the volume fraction. */
 
       if (ni == 0)
-	c[] = s.x[];
+	c[] = as.x[];
       else if (ni < 3 || ni > 6)
 	c[] = 0.; // this is important for robustness of embedded boundaries
       else
@@ -344,6 +335,19 @@ void fractions (struct Fractions a)
     }
   }
 #endif // dimension == 3
+#else  // dimension == 1
+  if (s.x.i)
+    foreach_face()
+      s.x[] = Phi[] > 0.;
+  foreach()
+    if ((Phi[] - val)*(Phi[1] - val) < 0.) {
+      c[] = (Phi[] - val)/(Phi[] - Phi[1]);
+      if (Phi[] < val)
+	c[] = 1. - c[];
+    }
+    else
+      c[] = (Phi[] > val || Phi[1] > val);
+#endif
 }
 
 /**
@@ -502,42 +506,33 @@ in most cases. Otherwise the interface normals are approximated from
 the volume fraction field, which results in a piecewise continuous
 (i.e. geometric VOF) interface representation. */
 
-struct OutputFacets {
-  scalar c;
-  FILE * fp;     // optional: default is stdout
-  face vector s; // optional: default is none
-};
-
 trace
-void output_facets (struct OutputFacets p)
+void output_facets (scalar c, FILE * fp = stdout, face vector s = {{-1}})
 {
-  scalar c = p.c;
-  face vector s = p.s;
-  if (!p.fp) p.fp = stdout;
-  if (!s.x.i) s.x.i = -1;
-
   foreach()
     if (c[] > 1e-6 && c[] < 1. - 1e-6) {
       coord n = facet_normal (point, c, s);
       double alpha = plane_alpha (c[], n);
-#if dimension == 2      
+#if dimension == 1
+      fprintf (fp, "%g\n", x + Delta*alpha/n.x);
+#elif dimension == 2
       coord segment[2];
       if (facets (n, alpha, segment) == 2)
-	fprintf (p.fp, "%g %g\n%g %g\n\n", 
+	fprintf (fp, "%g %g\n%g %g\n\n", 
 		 x + segment[0].x*Delta, y + segment[0].y*Delta, 
 		 x + segment[1].x*Delta, y + segment[1].y*Delta);
 #else // dimension == 3
       coord v[12];
       int m = facets (n, alpha, v, 1.);
       for (int i = 0; i < m; i++)
-	fprintf (p.fp, "%g %g %g\n",
+	fprintf (fp, "%g %g %g\n",
 		 x + v[i].x*Delta, y + v[i].y*Delta, z + v[i].z*Delta);
       if (m > 0)
-	fputc ('\n', p.fp);
+	fputc ('\n', fp);
 #endif
     }
 
-  fflush (p.fp);
+  fflush (fp);
 }
 
 /**

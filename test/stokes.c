@@ -28,14 +28,11 @@ discussion and [stokes-ns.c]() for the Navier-Stokes/VOF code. */
 #include "layered/nh.h"
 #include "layered/remap.h"
 #include "layered/perfs.h"
+#include "stokes.h"
 
-double ak = 0.35;
+double k_ = 2.*pi, h_ = 0.5, g_ = 1., ak = 0.35;
 double RE = 40000.;
-
-#define k_  (2.*pi)
-#define h_   0.5
-#define g_   1.
-#define T0  (k_/sqrt(g_*k_))
+#define T0  (k_*L0/sqrt(g_*k_))
 
 int main()
 {
@@ -49,8 +46,6 @@ int main()
   max_slope = 1.; // a bit less dissipative
   run();
 }
-
-#include "stokes.h"
 
 event init (i = 0)
 {

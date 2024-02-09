@@ -5,6 +5,7 @@
 int main()
 {
   int depth = 6;
+  size (1[0]);
   origin (-0.5, -0.5, -0.5);
 
 #if TREE

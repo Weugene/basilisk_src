@@ -54,7 +54,7 @@ h.t[bottom] = contact_angle (theta0*pi/180.);
 
 int main()
 {
-  size (2);
+  size (2 [1]);
 
   /**
   We use a constant viscosity. */

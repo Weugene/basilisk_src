@@ -18,7 +18,7 @@ centered on (0,0). We also set the viscosity and some parameters
 controlling the numerical scheme. */
 
 int main()
-{ 
+{
   // coordinates of lower-left corner
   origin (-0.5, -0.5);
   // number of grid points
@@ -31,7 +31,7 @@ int main()
   mu = muc;
 #endif
   // maximum timestep
-  DT = 0.1;
+  DT = 0.1 [0,1];
   // CFL number
   CFL = 0.8;
 

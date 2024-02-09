@@ -1445,7 +1445,12 @@ YY_RULE_SETUP
 {
   scope--;
   if (scope < 0) {
-    fprintf (stderr, "%s:%d: warning: mismatched '}'\n", fname, yylineno);
+    if (warninclude)
+      fprintf (stderr, "%s:%d: warning: mismatched '}'\n", fname, yylineno);
+    else {
+      fprintf (stderr, "%s:%d: error: mismatched '}'\n", fname, yylineno);
+      exit (1);
+    }
     scope = 0;
   }
 }
@@ -1453,7 +1458,7 @@ YY_RULE_SETUP
 case 6:
 /* rule 6 can match eol */
 YY_RULE_SETUP
-#line 220 "include.lex"
+#line 225 "include.lex"
 {
   // include "..."
   if (fdepend && strstr (yytext, "// nodep"))
@@ -1499,7 +1504,7 @@ YY_RULE_SETUP
 case 7:
 /* rule 7 can match eol */
 YY_RULE_SETUP
-#line 262 "include.lex"
+#line 267 "include.lex"
 {
     echo();
     hasgrid = 1;
@@ -1516,7 +1521,7 @@ YY_LINENO_REWIND_TO(yy_cp - 1);
 (yy_c_buf_p) = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 271 "include.lex"
+#line 276 "include.lex"
 {
   char * s = strstr (yytext, "dimension");
   space(s); nonspace(s);
@@ -1530,7 +1535,7 @@ YY_LINENO_REWIND_TO(yy_cp - 1);
 (yy_c_buf_p) = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 277 "include.lex"
+#line 282 "include.lex"
 {
   char * s = strstr (yytext, "BGHOSTS");
   space(s); nonspace(s);
@@ -1544,14 +1549,14 @@ YY_LINENO_REWIND_TO(yy_cp - 1);
 (yy_c_buf_p) = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 283 "include.lex"
+#line 288 "include.lex"
 {
   layers = 1;
 }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 287 "include.lex"
+#line 292 "include.lex"
 {
   // function definition
   echo();
@@ -1610,7 +1615,7 @@ YY_RULE_SETUP
 case 12:
 /* rule 12 can match eol */
 YY_RULE_SETUP
-#line 342 "include.lex"
+#line 347 "include.lex"
 {
   echo();
   if (ftags && !keywords_only)
@@ -1620,7 +1625,7 @@ YY_RULE_SETUP
 case 13:
 /* rule 13 can match eol */
 YY_RULE_SETUP
-#line 348 "include.lex"
+#line 353 "include.lex"
 {
   if (intypedef && scope == intypedef - 1) {
     echo();
@@ -1643,7 +1648,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 368 "include.lex"
+#line 373 "include.lex"
 {
   // keyword in target
   echo();
@@ -1652,12 +1657,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 374 "include.lex"
+#line 379 "include.lex"
 { echo(); if (incode && comment()) return 1; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 375 "include.lex"
+#line 380 "include.lex"
 {
   if (!incode)
     REJECT;
@@ -1667,27 +1672,27 @@ YY_RULE_SETUP
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 381 "include.lex"
+#line 386 "include.lex"
 echo();
 	YY_BREAK
 case 18:
 /* rule 18 can match eol */
 YY_RULE_SETUP
-#line 382 "include.lex"
+#line 387 "include.lex"
 echo();
 	YY_BREAK
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 383 "include.lex"
+#line 388 "include.lex"
 echo(); /* STRING_LITERAL */
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 385 "include.lex"
+#line 390 "include.lex"
 ECHO;
 	YY_BREAK
-#line 1691 "include.c"
+#line 1696 "include.c"
 			case YY_STATE_EOF(INITIAL):
 				yyterminate();
 
@@ -2679,7 +2684,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 385 "include.lex"
+#line 390 "include.lex"
 
 
 int yyerror (const char * s)
@@ -2780,7 +2785,6 @@ static int include (char * file, FILE * fin, FILE * fout)
 }
 
 FILE * writepath (char * path, const char * mode);
-void cleanup (int status, const char * dir);
 
 static void compdir (char * file, const char * dir)
 {
@@ -2790,7 +2794,7 @@ static void compdir (char * file, const char * dir)
     FILE * fin = fopen (path, "r");
     if (fin == NULL) {
       perror (path);
-      cleanup (1, dir);
+      exit (1);
     }
     FILE * fout = NULL;
     if (dir) {
@@ -2803,7 +2807,7 @@ static void compdir (char * file, const char * dir)
       fout = writepath (out, "w");
       if (fout == NULL) {
 	perror (out);
-	cleanup (1, dir);
+	exit (1);
       }
       free (out);
 
@@ -2819,7 +2823,7 @@ static void compdir (char * file, const char * dir)
       fputs ("\"\n", fout);
     }
     if (include (path, fin, fout))
-      cleanup (1, dir);
+      exit (1);
     fclose (fin);
     if (fout) {
       fputs ("\n#endif\n", fout);
@@ -2839,9 +2843,9 @@ static void prepend_path (char * path)
 }
 
 void includes (int argc, char ** argv,
-	      char ** grid1, int * default_grid,
-	      int * dim, int * bg, int * lyrs,
-	      const char * dir)
+	       char ** grid1, int * default_grid,
+	       int * dim, int * bg, int * lyrs,
+	       const char * dir)
 {
   int depend = 0, tags = 0, swig = 0;
   char * file = NULL, * output = NULL;
@@ -2876,7 +2880,7 @@ void includes (int argc, char ** argv,
 	     (tags || !strcmp (&argv[i][strlen(argv[i]) - 2], ".c"))) {
       if (file) {
 	fprintf (stderr, "usage: include [OPTIONS] FILE.c\n");
-	cleanup (1, dir);
+	exit (1);
       }
       file = argv[i];
     }
@@ -2904,7 +2908,7 @@ void includes (int argc, char ** argv,
     fdepend = fopen (ndep, "w");
     if (!fdepend) {
       perror (ndep);
-      cleanup (1, dir);
+      exit (1);
     }
     char * page = strstr (output, ".page");
     if (tags && page) {
@@ -2927,7 +2931,7 @@ void includes (int argc, char ** argv,
     ftags = fopen (ndep, "w");
     if (!ftags) {
       perror (ndep);
-      cleanup (1, dir);
+      exit (1);
     }
   }
   if (file) {
@@ -2940,7 +2944,7 @@ void includes (int argc, char ** argv,
       if (!swigfp) {
 	fprintf (stderr, "include: could not open '%s': ", swigname);
 	perror ("");
-	cleanup (1, dir);
+	exit (1);
       }
       *dot = '\0';
       fprintf (swigfp, "%%module %s\n", swigname);
@@ -2957,7 +2961,7 @@ void includes (int argc, char ** argv,
       if (!fp) {
 	fprintf (stderr, "include: invalid grid '%s': ", grid);
 	perror ("");
-	cleanup (1, dir);
+	exit (1);
       }
       fclose (fp);
       target = 0;
@@ -2969,7 +2973,7 @@ void includes (int argc, char ** argv,
       FILE * fp = openpath (pythonpath, "r", &path);
       if (!fp) {
 	perror (pythonpath);
-	cleanup (1, dir);
+	exit (1);
       }
       fclose (fp);
       target = 0;

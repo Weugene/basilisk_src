@@ -43,8 +43,8 @@ static int mpi_rank, mpi_npe;
 #endif // _cplusplus
 
 #define pi 3.14159265358979
-@undef HUGE
-@define HUGE ((double)1e30)
+#undef HUGE
+#define HUGE 1e30
 #define nodata HUGE
 @define _NVARMAX 65536
 @define is_constant(v) ((v).i >= _NVARMAX)
@@ -55,6 +55,7 @@ static int mpi_rank, mpi_npe;
 @define sq(x) ((x)*(x))
 @define cube(x) ((x)*(x)*(x))
 @define sign(x) ((x) > 0 ? 1 : -1)
+@define sign2(x) ((x) > 0 ? 1 : (x) < 0 ? -1 : 0)
 @define noise() (1. - 2.*rand()/(double)RAND_MAX)
 @define clamp(x,a,b) ((x) < (a) ? (a) : (x) > (b) ? (b) : (x))
 #define swap(type,a,b) do { type __tmp = a; a = b; b = __tmp; } while(0)
@@ -852,7 +853,7 @@ Grid * grid = NULL;
 // coordinates of the lower-left corner of the box
 double X0 = 0., Y0 = 0., Z0 = 0.;
 // size of the box
-double L0 = 1.;
+double L0 = 1. [1];
 // number of grid points
 #if dimension <= 2
 int N = 64;
@@ -924,10 +925,8 @@ void normalize (coord * n)
     n->x /= norm;
 }
 
-struct _origin { double x, y, z; };
-
-void origin (struct _origin p) {
-  X0 = p.x; Y0 = p.y; Z0 = p.z;
+void origin (double x = 0., double y = 0., double z = 0.) {
+  X0 = x; Y0 = y; Z0 = z;
 }
 
 void size (double L) {
@@ -949,12 +948,12 @@ int nboundary = 2*dimension;
 
 #define none -1
 
-@define dirichlet(expr)                 (2.*(expr) - val(_s,0,0,0))
-@define dirichlet_homogeneous()         (- val(_s,0,0,0))
-@define dirichlet_face(expr)            (expr)
-@define dirichlet_face_homogeneous()    (0.)
-@define neumann(expr)                   (Delta*(expr) + val(_s,0,0,0))
-@define neumann_homogeneous()           (val(_s,0,0,0))
+@define _dirichlet(expr, ...)             (2.*(expr) - val(_s,0,0,0))
+@define _dirichlet_homogeneous(...)       (- val(_s,0,0,0))
+@define _dirichlet_face(expr,...)         (expr)
+@define _dirichlet_face_homogeneous(...)  (0.)
+@define _neumann(expr,...)                (Delta*(expr) + val(_s,0,0,0))
+@define _neumann_homogeneous(...)         (val(_s,0,0,0))
 
 double  * _constant = NULL;
 size_t datasize = 0;
@@ -1147,6 +1146,14 @@ tensor * tensors_from_vectors (vector * v)
   return list;
 }
 
+static inline bool is_vertex_scalar (scalar s)
+{
+  foreach_dimension()
+    if (s.d.x != -1)
+      return false;
+  return true;
+}
+
 scalar * all = NULL; // all the fields
 scalar * baseblock = NULL; // base block fields
 
@@ -1242,7 +1249,7 @@ double timer_elapsed (timer t)
 	  (tvend.tv_usec - t.tv.tv_usec)/1e6);
 }
 
-// Constant fields
+// Constant fields // fixme: should be removed
 
 const face vector zerof[] = {0.,0.,0.};
 const face vector unityf[] = {1.,1.,1.};
@@ -1251,8 +1258,10 @@ const scalar zeroc[] = 0.;
 
 // Metric
 
-(const) face vector fm = unityf;
-(const) scalar cm = unity;
+const face vector unityf0[] = {1.[0],1.[0],1.[0]};
+const scalar unity0[] = 1.[0];
+(const) face vector fm = unityf0; // fixme: should just be fm = {1,1,1};
+(const) scalar cm = unity0; // fixme: should just be cm = 1.;
 
 // Embedded boundaries
 // these macros are overloaded in embed.h
@@ -1406,32 +1415,27 @@ void free_solver_func_add (free_solver_func func)
 
 static char * display_defaults = NULL;
 
-struct _display {
-  const char * commands;
-  bool overwrite;
-};
-
 static void free_display_defaults() {
   free (display_defaults);
 }
 
-void display (struct _display p)
+void display (const char * commands, bool overwrite = false)
 {
   if (display_defaults == NULL)
     free_solver_func_add (free_display_defaults);
-  if (p.overwrite) {
+  if (overwrite) {
     free (display_defaults);
-    display_defaults = malloc (strlen(p.commands) + 2);
+    display_defaults = malloc (strlen(commands) + 2);
     strcpy (display_defaults, "@");
-    strcat (display_defaults, p.commands);
+    strcat (display_defaults, commands);
   }
   else {
     if (!display_defaults)
       display_defaults = strdup ("@");
     display_defaults =
       realloc (display_defaults,
-	       strlen(display_defaults) + strlen(p.commands) + 1);
-    strcat (display_defaults, p.commands);
+	       strlen(display_defaults) + strlen(commands) + 1);
+    strcat (display_defaults, commands);
   }
 }
 
@@ -1442,3 +1446,7 @@ void display (struct _display p)
 #endif
 
 #include "grid/stencils.h"
+
+#define dirichlet(expr)                 _dirichlet(expr, point, neighbor, _s, data)
+#define dirichlet_face(expr)            _dirichlet_face(expr, point, neighbor, _s, data)
+#define neumann(expr)                   _neumann(expr, point, neighbor, _s, data)

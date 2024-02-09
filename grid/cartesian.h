@@ -286,14 +286,12 @@ void realloc_scalar (int size)
   datasize += size;
 }
 
-struct _locate { double x, y, z; };
-
-Point locate (struct _locate p)
+Point locate (double xp = 0, double yp = 0, double zp = 0)
 {
   Point point;
   point.n = cartesian->n;
-  point.i = (p.x - X0)/L0*point.n + 1;
-  point.j = (p.y - Y0)/L0*point.n + 1;
+  point.i = (xp - X0)/L0*point.n + 1;
+  point.j = (yp - Y0)/L0*point.n + 1;
   point.level = (point.i >= 1 && point.i <= point.n &&
 		 point.j >= 1 && point.j <= point.n) ? 0 : - 1;
   return point;

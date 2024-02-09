@@ -17,6 +17,8 @@ The main files are:
 * [translate.c](): the Basilisk C to C99 translator.
 * [stencil.c](): the analyzer for Basilisk stencils and automatic
   boundary conditions.
+* [interpreter/README](): A generic interpreter for Basilisk C.
+* [dimension.c](): Uses the interpreter to check dimensional consistency.
 
 ## Example of syntax tree generation
 
@@ -100,3 +102,7 @@ root
         │       └─';' ; <basilisk>:1
         └─'}' } <basilisk>:1
 </pre>
+
+## See also
+
+[A generic interpreter for Basilisk C](interpreter/README)

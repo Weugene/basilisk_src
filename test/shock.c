@@ -17,7 +17,7 @@ We define a new boundary for the cylinder. */
 bid cylinder;
 
 int main() {
-  size (5.);
+  size (5. [1]);
   G = 9.81;
   origin (-L0/2., -L0/2.);
   init_grid (1 << LEVEL);

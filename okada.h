@@ -77,6 +77,11 @@ static void okada_rectangular_source (const double U[3],
   double p = y*cosd + d*sind;
   double q = y*sind - d*cosd;
 
+  /**
+  There seems to be a problem with dimensions here. `x`, `p`, and `q`
+  should be the dimensionless coordinates, not the dimensional
+  ones... See also [tsunami.c](/src/examples/tsunami.c). */
+  
   u[0] = u[1] = u[2] = 0.;
   rectangular_source (U, cosd, sind, mulambda, d,
 		      x, p, q,
@@ -112,37 +117,27 @@ typedef struct {
   double vU[3];
 } Fault;
 
-struct Okada {
-  scalar d;
-  double x, y, depth;
-  double strike, dip, rake;
-  double mu, lambda;
-  double length, width, vU[3], U;
-  double R;
-  int (* iterate) (void);
-  bool flat, centroid;
-  Fault * faults;
-};
-
-void okada (struct Okada p)
+void okada (scalar d,
+	    double x = 0, double y = 0, double depth = 0,
+	    double strike = 0, double dip = 0, double rake = 0,
+	    double length = 0, double width = 0, double U = 0,
+	    double mu = 1, double lambda = 1,
+	    double R = 6371220., /* Earth radius (metres) */
+	    bool flat = false, bool centroid = false,
+	    Fault * faults = NULL)
 {
-  // default settings
-  if (p.mu == 0.)     p.mu = 1.;
-  if (p.lambda == 0.) p.lambda = 1.;
-  if (p.R == 0.)      p.R = 6371220.; /* Earth radius (metres) */
-
-  Fault faults[2] = {0};
-  if (p.faults == NULL) {
-    faults[0] = (Fault) {p.depth, p.x, p.y,
-			 p.strike, p.dip, p.rake,
-			 p.length, p.width, p.U};
-    p.faults = faults;
+  Fault lfaults[2] = {0};
+  if (faults == NULL) {
+    lfaults[0] = (Fault) {depth, x, y,
+                          strike, dip, rake,
+                          length, width, U};
+    faults = lfaults;
   }
   foreach() {
-    val(p.d) = 0.;
-    for (Fault * f = p.faults; f && f->depth > 0.; f++) {
+    d[] = 0.;
+    for (Fault * f = faults; f && f->depth > 0.; f++) {
       double depth = f->depth, dtr = pi/180.;
-      if (p.centroid)
+      if (centroid)
 	depth -= f->width*fabs (sin (f->dip*dtr))/2.;
       if (f->rake != nodata) {
 	f->vU[0] = f->U*cos (f->rake*dtr);
@@ -157,23 +152,23 @@ void okada (struct Okada p)
       double x0 = f->length/2., y0 = f->width/2.*cos (f->dip*dtr);
 
       double xc, yc;
-      if (p.flat) {
+      if (flat) {
 	xc = x - f->x;
 	yc = y - f->y;
       }
       else {
-	xc = p.R*cos(y*dtr)*dtheta(x, f->x)*dtr;
-	yc = p.R*dtheta(y, f->y)*dtr;
+	xc = R*cos(y*dtr)*dtheta(x, f->x)*dtr;
+	yc = R*dtheta(y, f->y)*dtr;
       }
       double x1 =   cosa*xc + sina*yc;
       double y1 = - sina*xc + cosa*yc;
       double oka[3];
       okada_rectangular_source (f->vU, f->length, f->width, depth, 
 				f->dip*dtr,
-				p.mu/p.lambda,
+				mu/lambda,
 				x0 + x1, y0 + y1,
 				oka);
-      val(p.d) += oka[2];
+      d[] += oka[2];
     }
   }
 }
@@ -196,9 +191,6 @@ to the fault parameters:
 * *mu, lambda*: only the ratio is important and default is  *mu/lambda* = 1.
 * *length, width, U*:  length and width of the fault plane and slip on
   the fault plane (generally in meters).
-* *vU[3]*: displacement vector. Note that vU[0] and vU[1] can be
-  calculated from rake and slip (U), vU[2] is tensile opening of a
-  fault so default is 0. (not needed as long as U and rake are given).
 * *R*: is the radius of the earth (for when x, y are in longitude and
   latitude i.e. *flat* = false).
 * *iterate*: is the function to use to iterate.
@@ -213,7 +205,14 @@ to the fault parameters:
   terminated by a "dummy fault" of depth smaller than or equal to zero. 
 */
 
-void fault (struct Okada p)
+void fault (double x = 0, double y = 0, double depth = 0,
+	    double strike = 0, double dip = 0, double rake = 0,
+	    double length = 0, double width = 0, double U = 0,
+	    double mu = 1, double lambda = 1,
+	    double R = 6371220., /* Earth radius (metres) */
+	    int (* iterate) (void) = NULL,
+	    bool flat = false, bool centroid = false,
+	    Fault * faults = NULL)
 {
   scalar hold[];
   // save the initial water depth
@@ -221,17 +220,17 @@ void fault (struct Okada p)
   foreach()
     hold[] = h[];
 
-  p.d = h;
   int nitermax = 20;
   do {
-    okada (p);
+    okada (h, x, y, depth, strike, dip, rake, length, width, U,
+	   mu, lambda, R, flat, centroid, faults);
     // h[] now contains the Okada vertical displacement
     foreach() {
       // deformation is added to hold[] (water depth) only in wet areas
       h[] = hold[] > dry ? max (0., hold[] + h[]) : hold[];
       eta[] = zb[] + h[];
     }
-  } while (p.iterate && p.iterate() && nitermax--);
+  } while (iterate && (* iterate) () && nitermax--);
 }
 
 /**

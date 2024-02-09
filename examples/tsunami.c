@@ -25,8 +25,8 @@ We then define a few useful macros and constants. */
 
 int maxlevel = 10;
 #define MINLEVEL 5
-#define ETAE     1e-2 // error on free surface elevation (1 cm)
-#define HMAXE    5e-2 // error on maximum free surface elevation (5 cm)
+double ETAE  = 1e-2; // error on free surface elevation (1 cm)
+double HMAXE = 5e-2; // error on maximum free surface elevation (5 cm) 
 
 /**
 The maximum number of levels to use can be set as an argument to the
@@ -45,7 +45,7 @@ int main (int argc, char * argv[])
   size of the box *L0* and the coordinates of the lower-left corner
   *(X0,Y0)* in degrees. */
 
-  Radius = 6371220.;
+  Radius = 6371220. [1];
   // the domain is 54 degrees squared
   size (54.);
   // centered on 94,8 longitude,latitude
@@ -147,7 +147,7 @@ int adapt() {
 
 We first specify the terrain database to use to reconstruct the
 topography $z_b$. This KDT database needs to be built beforehand. See the
-[*xyz2kdt* manual](http://gfs.sourceforge.net/wiki/index.php/Xyz2kdt)
+[*xyz2kdt* manual](http://gerris.dalembert.upmc.fr/xyz2kdt.html)
 for explanations on how to do this.
 
 We then consider two cases, either we restart from an existing
@@ -181,7 +181,7 @@ event init (i = 0)
     i.e. until the deformations are resolved properly. */
   
     fault (x = 94.57, y = 3.83,
-	   depth = 11.4857e3,
+	   depth = 11.4857e3, // fixme: this should be a length, but okada.h does not seem to be dimensionally consistent!!
 	   strike = 323, dip = 12, rake = 90,
 	   length = 220e3, width = 130e3,
 	   U = 18,
@@ -255,9 +255,10 @@ event logfile (i++) {
   \frac{d\mathbf{u}}{dt} = - C_f|\mathbf{u}|\frac{\mathbf{u}}{h}
   $$
   with $C_f=10^{-4}$. */
-  
+
+  double C_f = 1e-4;
   foreach() {
-    double a = h[] < dry ? HUGE : 1. + 1e-4*dt*norm(u)/h[];
+    double a = h[] < dry ? HUGE : 1. + C_f*dt*norm(u)/h[];
     foreach_dimension()
       u.x[] /= a;
 

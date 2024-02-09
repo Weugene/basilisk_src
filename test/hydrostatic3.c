@@ -17,10 +17,11 @@ void porous (scalar cs, face vector fs)
   coord pc[ns];
   double R[ns];
   srand (0);
+  double a = 0.5, b = 0.04;
   for (int i = 0; i < ns; i++) {
     foreach_dimension()
-      pc[i].x = 0.5*noise();
-    R[i] = 2.*(0.02 + 0.04*fabs(noise()));
+      pc[i].x = a*noise();
+    R[i] = 2.*(0.02 + b*fabs(noise()));
   }
     
   vertex scalar phi[];

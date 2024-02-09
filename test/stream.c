@@ -28,10 +28,10 @@ separated by twice *dd* and with caracteristic radii *dd/10*. */
 
 event init (i = 0)
 {
-  double dd = 0.1;
+  double dd = 0.1, a = 1., b = 10.;
   foreach()
-    omega[] = (exp(-(sq(x - dd) + sq(y))/(dd/10.)) +
-	       exp(-(sq(x + dd) + sq(y))/(dd/10.)));
+    omega[] = a*(exp(-(sq(x - dd) + sq(y))/(dd/b)) +
+		 exp(-(sq(x + dd) + sq(y))/(dd/b)));
 }
 
 /**

@@ -82,6 +82,34 @@ $$
 \partial_t p + \mathbf{u}\cdot\nabla p = -\rho c^2\nabla\cdot\mathbf{u}
 $$
 
+* [All Mach compressible two-phase flows](compressible/two-phase.h)
+
+$$
+\frac{\partial (f \rho_i)}{\partial t } + 
+\nabla \cdot (f \rho_i \mathbf{u}) = 0 
+$$
+$$
+\frac{\partial (\rho_i \mathbf{u})}{\partial t } + 
+\nabla \cdot ( \rho_i  \mathbf{u} \mathbf{u}) = 
+-\nabla p + \nabla \cdot \tau_i' 
+$$
+$$
+\frac{\partial [\rho_i (e_i + \mathbf{u}^2/2)]}{\partial t } 
++ \nabla \cdot [ \rho_i \mathbf{u} (e_i  + \mathbf{u}^2/2)] =
+-\nabla \cdot (\mathbf{u} p_i) + 
+\nabla \cdot \left( \tau'_i \mathbf{u} \right)
+$$
+
+* [Thermal effects for all Mach compressible two-phase flows](compressible/thermal.h)
+
+$$
+\rho_ic_{p,i}\frac{DT_i}{Dt} = \beta_iT_i\frac{Dp_i}{Dt} - \nabla\cdot\mathbf{q}_i
+$$
+$$
+\left(\frac{\gamma_i}{\rho_ic_i^2} - \frac{\beta_i^2T_i}{\rho_ic_{p,i}}\right)\frac{Dp_i}{Dt} = 
+-\frac{\beta_i}{\rho_ic_{p,i}}\nabla\cdot\mathbf{q}_i - \nabla\cdot\mathbf{u}_i
+$$
+
 ## Navier--Stokes
 * [Streamfunction--Vorticity formulation](navier-stokes/stream.h)
 $$
@@ -185,7 +213,21 @@ $$
 \phi\mathbf{n}\delta_s
 $$
     + [Surface tension](tension.h)
+$$
+\sigma\kappa\mathbf{n}\delta_s
+$$
     + [Reduced gravity](reduced.h)
+$$
+[\rho]\mathbf{g}\cdot\mathbf{x}\mathbf{n}\delta_s
+$$
+    + [Surface tension (integral formulation)](integral.h)
+$$
+\sigma^{x x}_i = \left[ \gamma \frac{t^x}{\Delta} +
+   \left\{\begin{array}{ll}
+     s^x  (p_{j - 1} - p_j) & \text{if } s^x < 1 / 2\\
+     (s^x - 1)  (p_j - p_{j + 1}) & \text{otherwise}
+   \end{array}\right. \right]_i
+$$
 * [Reaction--Diffusion](diffusion.h)
 $$ 
 \theta\partial_tf = \nabla\cdot(D\nabla f) + \beta f + r
@@ -204,6 +246,14 @@ $$
 \frac{\partial\mathbf{u}}{\partial t} = L(\mathbf{u}, t)
 $$
 * [Signed distance field](distance.h)
+* [Redistancing of a distance field](redistance.h)
+$$
+\left\{\begin{array}{ll}
+\phi_t + \text{sign}(\phi^{0}) \left(\left| \nabla \phi\right| - 1 \right) = 0\\ 
+\phi(x,0) = \phi^0(x)
+\end{array}
+\right.
+$$
 * [Okada fault model](okada.h)
 * [Hessenberg systems](hessenberg.h)
 * [Community Ocean Vertical Mixing (CVMix) interface](cvmix/cvmix.h)
@@ -213,6 +263,7 @@ $$
 
 * [qcc](qcc.c): the command line preprocessor/compiler
 * [The Abstract Syntax Tree (AST) library](ast/README)
+* [Dimensional Analysis](ast/interpreter/dimension.c)
 
 # General orthogonal coordinates
 
@@ -244,6 +295,7 @@ Several metric spaces/coordinate systems are predefined:
     \frac{\partial^2\psi}{\partial r^2} - \frac{1}{r}\partial_r\psi 
     = - \omega r
     $$
+* [Spherical symmetry](spherisym.h)
 * [Spherical](spherical.h)
 * [Radial/cylindrical](radial.h)
 

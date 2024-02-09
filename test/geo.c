@@ -85,7 +85,7 @@ plot 'log' index 'Beta = 1.607e-11' u 1:($3 + $4) w l t 'Total',	\
   year = 	 {2007},
   number =       {16},
   pages =        {224-249},
-  url =          {http://gfs.sf.net/ocean.pdf}
+  url =          {http://gerris.dalembert.upmc.fr/ocean.pdf}
 }
 
 @phdthesis{dupont2001,

@@ -17,10 +17,11 @@ int main()
 
 event init (i = 0)
 {
+  double a = 1., l2 = 200.;
   foreach() {
-    h[] = exp(-200.*(x*x));
+    h[] = a*exp(- l2*(x*x));
     x -= -0.25;
-    zb[] = exp(-200.*(x*x));
+    zb[] = a*exp(- l2*(x*x));
     h[] = max(h[] - zb[], 0.);
   }
 }

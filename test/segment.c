@@ -21,8 +21,8 @@ int main()
   periodic (left);
   vector u[];
   foreach() {
-    u.x[] = sin(2.*pi*x);
-    u.y[] = sin(6.*pi*x);
+    u.x[] = sin(2.[-1]*pi*x);
+    u.y[] = sin(6.[-1]*pi*x);
   }
   output_cells();
 

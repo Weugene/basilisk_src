@@ -32,8 +32,9 @@ p[right] = dirichlet(0);
 
 event init (i = 0)
 {
+  double a = 0.25, k = pi/0.1;
   foreach() {
-    zb[] = 0.25*(cos(pi*x/0.1) + 1.)*(fabs(x) < 0.1);
+    zb[] = a*(cos(k*x) + 1.)*(fabs(x) < 0.1);
     h[] = 0.8 - zb[];
   }
 }

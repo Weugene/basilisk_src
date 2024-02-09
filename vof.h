@@ -272,18 +272,25 @@ static void sweep_x (scalar c, scalar cc, scalar * tcl)
   non-zero for the one-dimensional velocity field -- is approximated using
   a centered volume fraction field `cc` which will be defined below. 
 
-  For tracers, the one-dimensional update is simply
+  For tracers, the corresponding one-dimensional update is
   $$
-  \partial_tt_j = -\nabla_x\cdot(\mathbf{u}_f t_j)
+  \partial_tt_j = -\nabla_x\cdot(\mathbf{u}_f t_j) + t_j\nabla_x\cdot\mathbf{u}_f
   $$
-  */
+  The compressive second-term can be removed by defining the
+  NO_1D_COMPRESSION macro. */
 
 #if !EMBED
   foreach() {
     c[] += dt*(flux[] - flux[1] + cc[]*(uf.x[1] - uf.x[]))/(cm[]*Delta);
+#if NO_1D_COMPRESSION
+    scalar t, tflux;
+    for (t, tflux in tracers, tfluxl)
+      t[] += dt*(tflux[] - tflux[1])/(cm[]*Delta);
+#else // !NO_1D_COMPRESSION
     scalar t, tc, tflux;
     for (t, tc, tflux in tracers, tcl, tfluxl)
       t[] += dt*(tflux[] - tflux[1] + tc[]*(uf.x[1] - uf.x[]))/(cm[]*Delta);
+#endif // !NO_1D_COMPRESSION
   }
 #else // EMBED
   /**
@@ -296,9 +303,14 @@ static void sweep_x (scalar c, scalar cc, scalar * tcl)
   foreach()
     if (cs[] > 0.) {
       c[] += dt*(flux[] - flux[1] + cc[]*(uf.x[1] - uf.x[]))/Delta;
+#if NO_1D_COMPRESSION
+      for (t, tflux in tracers, tfluxl)
+	t[] += dt*(tflux[] - tflux[1])/Delta;
+#else // !NO_1D_COMPRESSION
       scalar t, tc, tflux;
       for (t, tc, tflux in tracers, tcl, tfluxl)
 	t[] += dt*(tflux[] - tflux[1] + tc[]*(uf.x[1] - uf.x[]))/Delta;
+#endif // !NO_1D_COMPRESSION
     }
 #endif // EMBED
 
@@ -324,8 +336,10 @@ void vof_advection (scalar * interfaces, int i)
 
     scalar cc[], * tcl = NULL, * tracers = c.tracers;    
     for (scalar t in tracers) {
+#if !NO_1D_COMPRESSION
       scalar tc = new scalar;
       tcl = list_append (tcl, tc);
+#endif // !NO_1D_COMPRESSION
 #if TREE
       if (t.refine != vof_concentration_refine) {
 	t.refine = t.prolongation = vof_concentration_refine;
@@ -337,6 +351,7 @@ void vof_advection (scalar * interfaces, int i)
     }
     foreach() {
       cc[] = (c[] > 0.5);
+#if !NO_1D_COMPRESSION
       scalar t, tc;
       for (t, tc in tracers, tcl) {
 	if (t.inverse)
@@ -344,6 +359,7 @@ void vof_advection (scalar * interfaces, int i)
 	else
 	  tc[] = c[] > 0.5 ? t[]/c[] : 0.;
       }
+#endif // !NO_1D_COMPRESSION
     }
 
     /**
@@ -378,7 +394,7 @@ event vof (i++)
   volume = {71},
   year = {2015},
   doi = {doi.org/10.1016/j.ijmultiphaseflow.2014.12.005},
-  url = {http://gfs.sf.net/papers/lopez2015.pdf}
+  url = {http://gerris.dalembert.upmc.fr/papers/lopez2015.pdf}
 }
 ~~~
 */

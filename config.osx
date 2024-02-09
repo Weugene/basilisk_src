@@ -1,5 +1,5 @@
 # -*-Makefile-*-
-
+CC = /opt/homebrew/bin/gcc-13
 # the C99 flags
 C99_FLAGS = -std=c99
 

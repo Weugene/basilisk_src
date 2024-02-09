@@ -134,6 +134,6 @@ $$ */
 
 event projection (i++,last)
 {
-  const face vector unity[] = {1.,1.};
+  const face vector unity[] = {1.[0],1.[0]};
   mgp = project (u, p, unity, dt, mgp.nrelax);
 }

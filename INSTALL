@@ -14,13 +14,13 @@ On a Debian-like system (i.e. Debian, Ubuntu etc...) installing darcs
 is as easy as
 
 ~~~bash
-sudo apt install darcs flex bison make gawk
+sudo apt install darcs make gawk
 ~~~
 
 To get the latest Basilisk source code do
 
 ~~~bash
-darcs get http://basilisk.fr/basilisk
+darcs clone http://basilisk.fr/basilisk
 ~~~
 
 If later you want to update the source code, you just need to do
@@ -34,12 +34,8 @@ and recompile using
 
 ~~~bash
 make -k clean
-make -k
 make
 ~~~
-
-Note that the [Basilisk View installation](#visualisation) may also
-need separate recompilation.
 
 ## Using a tarball
 
@@ -59,17 +55,13 @@ extract the archive where you want to install it.
 # Compilation
 
 For compilation, the only requirement is a C99-compliant compiler and
-the `make` utility (a version of `make` compatible with GNU make is
-recommended but not essential).
+a version of `make` compatible with GNU make.
 
 If you are using gcc on a UNIX-like system, this should work:
 
 ~~~bash
 cd basilisk/src
-export BASILISK=$PWD
-export PATH=$PATH:$PWD
 ln -s config.gcc config
-make -k
 make
 ~~~
 
@@ -92,14 +84,15 @@ You can also edit this file to customise things for your system
 Note also that there is a specific [installation
 guide](/sandbox/INSTALL_MACOS) contributed by Mac OSX users.
 
-To avoid having to re-type the two export commands above everytime you
-login, you should also add them to your `$HOME/.bashrc` file. You can
+To avoid having to type the full path to the [qcc](qcc.c) executable,
+you can add the following 'export' commands to your `$HOME/.bashrc`
+file (or a similar file if you are using another shell). You can
 either edit `$HOME/.bashrc` manually or do
 
 ~~~bash
 cd basilisk/src
 echo "export BASILISK=$PWD" >> ~/.bashrc
-echo "export PATH=\$PATH:$BASILISK" >> ~/.bashrc
+echo 'export PATH=$PATH:$BASILISK' >> ~/.bashrc
 ~~~
 
 # Useful additional packages
@@ -113,28 +106,12 @@ echo "export PATH=\$PATH:$BASILISK" >> ~/.bashrc
 - pstoedit
 
 and also
-[gprof2dot](http://code.google.com/p/jrfonseca/wiki/Gprof2Dot). On a
+[gprof2dot](https://github.com/jrfonseca/gprof2dot). On a
 Debian-like system (i.e. Debian, Ubuntu, Mint etc...) you just need to do
 
 ~~~bash
 sudo apt install gnuplot imagemagick ffmpeg graphviz valgrind gifsicle pstoedit
 ~~~
-
-# Visualisation
-
-By default Basilisk will be configured for interactive visualisation
-with [Basilisk View](jview/README). Online visualisation with
-[view.h]() will not work however (it will just produce black
-images). Online visualisation requires an implementation of OpenGL
-which allows writing into framebuffers, which can be difficult to
-setup on some systems.
-
-To setup online visualisation, three steps are required:
-
-1. Follow the instructions in [gl/INSTALL]() to choose an OpenGL
-   implementation and compile the libraries.
-2. Edit the `config` file to setup the corresponding libraries.
-3. Make again.
 
 # Using Basilisk from within python
 

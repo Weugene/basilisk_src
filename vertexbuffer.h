@@ -7,7 +7,7 @@ computed by the the OpenGL commands typically used by [draw.h]().
 These vertex buffers are the minimal information required to render
 the objects. 
 
-In combination with the ["dumb GL" implementation](gl/fb_dumb.c) this
+In combination with the [tiny implementation](gl/fb_tiny.c) this
 allows to generate geometries using OpenGL commands but without any
 OpenGL library. */
 
@@ -58,7 +58,7 @@ void vertex_buffer_free()
   VertexBuffer.index = NULL;
 }
 
-static void vertex_buffer_glBegin (int state)
+static void vertex_buffer_glBegin (unsigned int state)
 {
   if (VertexBuffer.index) {
 
@@ -105,12 +105,12 @@ static void vertex_buffer_glBegin (int state)
       break;
     }
   }
-  glBegin (state);
+  else
+    glBegin (state);
 }
 
 static void vertex_buffer_glEnd()
 {
-  glEnd();
   if (VertexBuffer.index) {
     int type = -1;
     switch (VertexBuffer.state) {
@@ -181,30 +181,32 @@ static void vertex_buffer_glEnd()
     else
       VertexBuffer.type = type;
   }
+  else
+    glEnd();
 }
 
 static void vertex_buffer_glColor3f (float r, float g, float b)
 {
-  glColor3f (r, g, b);
   if (VertexBuffer.color) {
     struct { float x, y, z; } color = {r, g, b}; // fixme: use r,g,b directly
     array_append (VertexBuffer.color, &color, 3*sizeof(float));
   }
+  else
+    glColor3f (r, g, b);
 }
 
 static void vertex_buffer_glNormal3d (double nx, double ny, double nz)
 {
-  glNormal3d (nx, ny, nz);
   if (VertexBuffer.normal) {
     struct { float x, y, z; } normal = {nx, ny, nz};
     array_append (VertexBuffer.normal, &normal, 3*sizeof(float));
   }
+  else
+    glNormal3d (nx, ny, nz);
 }
 
 static void vertex_buffer_glVertex3d (double x, double y, double z)
 {
-  glVertex3d (x, y, z);
-
   if (VertexBuffer.position) {
     if (VertexBuffer.dim < 3)
       VertexBuffer.dim = 3;
@@ -213,12 +215,12 @@ static void vertex_buffer_glVertex3d (double x, double y, double z)
     array_append (VertexBuffer.position, v, 3*sizeof(float));
     VertexBuffer.nvertex++;
   }
+  else
+    glVertex3d (x, y, z);    
 }
 
 static void vertex_buffer_glVertex2d (double x, double y)
 {
-  glVertex3d (x, y, 0.);
-  
   if (VertexBuffer.position) {
     if (VertexBuffer.dim < 2)
       VertexBuffer.dim = 2;
@@ -226,7 +228,9 @@ static void vertex_buffer_glVertex2d (double x, double y)
     vector_multiply (v, VertexBuffer.modelview);
     array_append (VertexBuffer.position, v, 3*sizeof(float));
     VertexBuffer.nvertex++;
-  }  
+  }
+  else
+    glVertex3d (x, y, 0.);
 }
 
 /**

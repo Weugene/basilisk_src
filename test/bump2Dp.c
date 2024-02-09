@@ -21,9 +21,10 @@ int main (int argc, char * argv[])
 
 event init (i = 0)
 {
+  double a = 1., b = 200.;
   if (!restore (file = "bump2Dp-restore.dump"))
     foreach()
-      h[] = 0.1 + 1.*exp(-200.*(x*x + y*y));
+      h[] = 0.1 + a*exp(- b*(x*x + y*y));
 }
 
 event logfile (i++) {

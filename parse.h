@@ -48,13 +48,13 @@ static bool args (Params * p, char * val)
 
   case pcolormap:
     if (!strcmp (val, "jet"))
-      *((colormap *)p->val) = jet;
+      *((Colormap *)p->val) = jet;
     else if (!strcmp (val, "cool_warm"))
-      *((colormap *)p->val) = cool_warm;
+      *((Colormap *)p->val) = cool_warm;
     else if (!strcmp (val, "gray"))
-      *((colormap *)p->val) = gray;
+      *((Colormap *)p->val) = gray;
     else if (!strcmp (val, "randomap"))
-      *((colormap *)p->val) = randomap;
+      *((Colormap *)p->val) = randomap;
     else {
       fprintf (stderr, "unknown colormap '%s'\n", val);
       return false;

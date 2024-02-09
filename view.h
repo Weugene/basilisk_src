@@ -42,31 +42,20 @@ libraries. This can be done automatically using something like:
 qcc -autolink -Wall -O2 program.c -o program -lm
 ~~~
 
-(provided qcc is [properly configured](INSTALL#visualisation)) or
-manually using e.g.:
+or manually using e.g.:
 
 ~~~bash
-qcc -Wall -O2 program.c -o program \
-    -L$BASILISK/gl -lglutils -lfb_osmesa -lGLU -lOSMesa -lm
+qcc -Wall -O2 program.c -o program -L$BASILISK/gl -lglutils -lfb_tiny -lm
 ~~~
-
-or
-
-~~~bash
-qcc -Wall -O2 program.c -o program \
-    -L$BASILISK/gl -lglutils -lfb_glx -lGLU -lGLEW -lGL -lX11
-~~~
-
-depending on which version of OpenGL should be used.
 
 # Implementation
 
 We include the various helper functions defined either by the system
 or by the Basilisk libraries in gl/. */
 
-#include <gl/framebuffer.h>
-#include <gl/trackball.h>
-#include <gl/utils.h>
+#include "gl/framebuffer.h"
+#include "gl/trackball.h"
+#include "gl/utils.h"
 #pragma autolink -L$BASILISK/gl -lglutils $OPENGLIBS
 
 #include "utils.h"
@@ -144,6 +133,8 @@ static void free_cexpr (cexpr * cache)
 
 Contains the definition of the current view. */
 
+typedef void (* MapFunc) (coord *);
+
 struct _bview {
   float tx, ty, sx, sy, sz;
   float quat[4];
@@ -162,7 +153,7 @@ struct _bview {
   framebuffer * fb;
   Frustum frustum; // the view frustum
 
-  void (* map) (coord *); // an optional mapping function
+  MapFunc map; // an optional mapping function
   
   int ni; // number of items drawn
   
@@ -193,7 +184,7 @@ bview * bview_new()
   p->bg[0] = 0.3; p->bg[1] = 0.4; p->bg[2] = 0.6;
 #endif
   p->res = 1.;
-  p->lc = 0.001;
+  p->lc = 0.004;
 
   p->samples = 4;
   p->width = 600*p->samples, p->height = 600*p->samples;
@@ -260,14 +251,14 @@ static void redraw() {
 
   if (view->far <= view->near) { // "traditional" camera parameters
     double max = 2.;    
-    gluPerspective (view->fov, view->width/(float)view->height, 1., 1. + 2.*max);
+    gl_perspective (view->fov, view->width/(float)view->height, 1., 1. + 2.*max);
 
     glMatrixMode (GL_MODELVIEW);	    
     glLoadIdentity ();
     glTranslatef (view->tx, view->ty, - (1. + max));
   }
   else { // camera parameters compatible with interactive Basilisk View
-    gluPerspective (view->fov, view->width/(float)view->height,
+    gl_perspective (view->fov, view->width/(float)view->height,
 		    view->near, view->far);
 
     glMatrixMode (GL_MODELVIEW);	    
@@ -308,6 +299,8 @@ bview * draw() {
     /* OpenGL somehow generates floating-point exceptions... turn them off
        See also: https://bugs.freedesktop.org/show_bug.cgi?id=108856 */
     disable_fpe (FE_DIVBYZERO|FE_INVALID);
+  glMatrixMode (GL_PROJECTION);
+  glTranslatef (0, 0, - 1e-4); // next object is drawn below the current one
   return view;
 }
 
@@ -343,6 +336,7 @@ trace
 static pointer compose_image (bview * view)
 {
   unsigned char * image = framebuffer_image (view->fb);
+  assert (image);
   if (npe() > 1) {
     MPI_Op op;
     MPI_Op_create (compose_image_op, true, &op);    
@@ -378,6 +372,7 @@ trace
 static pointer compose_image (bview * view)
 {
   unsigned char * image = framebuffer_image (view->fb);
+  assert (image);
   if (npe() > 1) {
     MPI_Op op;
     MPI_Op_create (compose_image_op, true, &op);
@@ -388,11 +383,11 @@ static pointer compose_image (bview * view)
 			    (MPI_Datatype[]){MPI_BYTE, MPI_FLOAT},
 			    &rgba);
     MPI_Type_commit (&rgba);
-    fbdepth_t * depth = framebuffer_depth (view->fb);
+    float * depth = framebuffer_depth (view->fb);
     int size = view->width*view->height;
     RGBA * buf = malloc (size*sizeof(RGBA));
     unsigned char * ptr = image;
-    fbdepth_t * dptr = depth;
+    float * dptr = depth;
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < 4; j++)
 	buf[i].a[j] = *ptr++;
@@ -439,13 +434,16 @@ Besides the *load()*, *save()* and drawing functions defined in
 * [*input_gfs()*](input.h#input_gfs-gerris-simulation-format)
 */
 
-struct _load {
-  FILE * fp;   // read commands from this file
-  char * file; // read commands from this file
-  Array * buf; // read commands from this buffer
-};
+bool load (FILE * fp = NULL, char * file = NULL, Array * buf = NULL);
 
-bool load (struct _load p);
+static void bview_draw (bview * view)
+{
+  if (!view->active)
+    return;
+  view->active = false;
+  glFinish ();
+  enable_fpe (FE_DIVBYZERO|FE_INVALID);
+}
 
 /**
 ## *save()*: saves drawing to a file in various formats
@@ -493,81 +491,72 @@ Note that MPI-parallel output is only implemented for the "ppm" format
 at the moment. Other animation and image formats will be automatically
 converted to PPM when using MPI. */
 
-struct _save {
-  char * file, * format, * opt;
-  FILE * fp;
-  float lw; /* base line width for vector drawings */
-  int sort, options;
-
-  bview * view;
-};
-
-static void bview_draw (bview * view)
-{
-  if (!view->active)
-    return;
-  view->active = false;
-  glFinish ();
-  enable_fpe (FE_DIVBYZERO|FE_INVALID);
-}
-
 trace
-bool save (struct _save p)
+bool save (char * file = NULL, char * format = "ppm", char * opt = NULL,
+	   FILE * fp = NULL,
+	   float lw = 0,
+	   int sort = 0, int options = 0,
+	   
+	   bview * view = NULL)
 {
-  char ppm[] = "ppm";
-  if (!p.format) {
-    p.format = ppm;
-    if (p.file) {
-      char * s = strchr (p.file, '.'), * dot = s;
-      while (s) {
-	dot = s;
-	s = strchr (s + 1, '.');
-      }
-      if (dot)
-	p.format = dot + 1;
+  if (file) {
+    char * s = strchr (file, '.'), * dot = s;
+    while (s) {
+      dot = s;
+      s = strchr (s + 1, '.');
     }
+    if (dot)
+      format = dot + 1;
   }
 
-  bview * view = p.view ? p.view : get_view();
-  
-  if (!strcmp (p.format, "png") ||
-      !strcmp (p.format, "jpg") ||
-      (p.file && is_animation (p.file))) {
+  if (!view)
+    view = get_view();
+
+  if ((!strcmp (format, "png") && which ("convert")) ||
+      !strcmp (format, "jpg") ||
+      (file && is_animation (file))) {
     bview_draw (view);
     unsigned char * image = (unsigned char *) compose_image (view);
     if (pid() == 0) {
-      FILE * fp = open_image (p.file, p.opt);
+      FILE * fp = open_image (file, opt);
       if (!fp) {
-	perror (p.file);
+	perror (file);
 	return false;
       }      
       gl_write_image (fp, image, view->width, view->height, view->samples);
-      close_image (p.file, fp);
+      close_image (file, fp);
     }
     return true;
   }  
   
-  if (p.file && (p.fp = fopen (p.file, "w")) == NULL) {
-    perror (p.file);
+  if (file && (fp = fopen (file, "w")) == NULL) {
+    perror (file);
     return false;
   }
-  if (!p.fp)
-    p.fp = stdout;
+  if (!fp)
+    fp = stdout;
 
-  if (!strcmp (p.format, "ppm")) {
+  if (!strcmp (format, "ppm")) {
     bview_draw (view);
     unsigned char * image = (unsigned char *) compose_image (view);
     if (pid() == 0)
-      gl_write_image (p.fp, image, view->width, view->height, view->samples);    
+      gl_write_image (fp, image, view->width, view->height, view->samples);    
   }
 
-  else if (!strcmp (p.format, "bv")) {
+  else if (!strcmp (format, "png")) {
+    bview_draw (view);
+    unsigned char * image = (unsigned char *) compose_image (view);
+    if (pid() == 0)
+      gl_write_image_png (fp, image, view->width, view->height, view->samples);
+  }
+
+  else if (!strcmp (format, "bv")) {
 #if 1 // fixme: not implemented yet
     fprintf (ferr, "save(): error: the '%s' format is no longer supported\n",
-	     p.format);
+	     format);
 #else
-    assert (p.history);
-    fprintf (p.fp,
+    assert (history);
+    fprintf (fp,
 	     "view (fov = %g, quat = {%g,%g,%g,%g}, "
 	     "tx = %g, ty = %g, "
 	     "bg = {%g,%g,%g}, "
@@ -579,34 +568,34 @@ bool save (struct _save p)
 	     view->bg[0], view->bg[1], view->bg[2],
 	     view->width/view->samples, view->height/view->samples,
 	     view->samples);
-    fwrite (p.history->p, 1, p.history->len, p.fp);
+    fwrite (history->p, 1, history->len, fp);
 #endif
   }
   
-  else if (!strcmp (p.format, "gnu") ||
-	   !strcmp (p.format, "obj") ||
-	   !strcmp (p.format, "kml") ||
-	   !strcmp (p.format, "ps")  ||
-	   !strcmp (p.format, "eps") ||
-	   !strcmp (p.format, "tex") ||
-	   !strcmp (p.format, "pdf") ||
-	   !strcmp (p.format, "svg") ||
-	   !strcmp (p.format, "pgf"))
+  else if (!strcmp (format, "gnu") ||
+	   !strcmp (format, "obj") ||
+	   !strcmp (format, "kml") ||
+	   !strcmp (format, "ps")  ||
+	   !strcmp (format, "eps") ||
+	   !strcmp (format, "tex") ||
+	   !strcmp (format, "pdf") ||
+	   !strcmp (format, "svg") ||
+	   !strcmp (format, "pgf"))
     fprintf (ferr, "save(): error: the '%s' format is no longer supported\n",
-	     p.format);
+	     format);
 
   else {
-    fprintf (ferr, "save(): unknown format '%s'\n", p.format);
-    if (p.file) {
-      fclose (p.fp);
-      remove (p.file);
+    fprintf (ferr, "save(): unknown format '%s'\n", format);
+    if (file) {
+      fclose (fp);
+      remove (file);
     }
     return false;
   }
 
-  fflush (p.fp);
-  if (p.file)
-    fclose (p.fp);
+  fflush (fp);
+  if (file)
+    fclose (fp);
 
   return true;
 }
@@ -633,23 +622,15 @@ static char * remove_blanks (char * line)
   return line;
 }
 
-/**
-The [draw_get.h]() file is generated automatically by [params.awk]()
-and contains parsing commands for the functions defined in
-[draw.h](). */
-
-#include "draw_get.h"
+#include "parse.h"
 
 bool process_line (char * line)
 {
   if (line[0] == '\0')
     return true;
-  char * buf = strdup (line);
   char * s = mystrtok (remove_blanks (line), "(");
-  if (!s) {
-    free (buf);
+  if (!s)
     return true;
-  }
 
   if (!strcmp (s, "restore")) {
     char * file = NULL;
@@ -700,120 +681,49 @@ bool process_line (char * line)
     if (file)
       load (file = file);
   }
-        
-  else if (!strcmp (s, "cells")) {
-    struct _cells p = {{0}};
-    if (!_cells_get (&p) || !cells (p))
-      return false;
-  }
 
-  else if (!strcmp (s, "vectors")) {
-    struct _vectors p = {0};
-    if (!_vectors_get (&p) || !vectors (p))
-      return false;
-  }
-        
-  else if (!strcmp (s, "draw_vof")) {
-    struct _draw_vof p = {0};
-    if (!_draw_vof_get (&p) || !draw_vof (p))
-      return false;
-  }
-    
-  else if (!strcmp (s, "isoline")) {
-    struct _isoline p = {0};
-    if (!_isoline_get (&p) || !isoline (p))
-      return false;
-  }
-    
-  else if (!strcmp (s, "squares")) {
-    struct _squares p = {0};
-    if (!_squares_get (&p) || !squares (p))
-      return false;
-  }
-  
-  else if (!strcmp (s, "begin_translate")) {
-    struct _translate p = {0};
-    _translate_get (&p);
-    begin_translate (p);
-  }
+  /**
+  The [draw_get.h]() file is generated automatically by [params.awk]()
+  and contains parsing commands for the functions defined in
+  [draw.h](). */
 
-  else if (!strcmp (s, "end_translate"))
-    end_translate();
-  
-  else if (!strcmp (s, "begin_mirror")) {
-    struct _mirror p = {{0}};
-    _mirror_get (&p);
-    begin_mirror (p);
-  }
+  #include "draw_get.h"
 
   else if (!strcmp (s, "end_mirror"))
     end_mirror();
   
-  else if (!strcmp (s, "squares")) {
-    struct _squares p = {0};
-    if (!_squares_get (&p) || !squares (p))
-      return false;
-  }
-    
-  else if (!strcmp (s, "isosurface")) {
-    struct _isosurface p = {0};
-    if (!_isosurface_get (&p) || !isosurface (p))
-      return false;
-  }
-    
-  else if (!strcmp (s, "draw_string")) {
-    struct _draw_string p = {0};
-    if (!_draw_string_get (&p) || !draw_string (p))
-      return false;
-  }
-
-  else if (!strcmp (s, "labels")) {
-    struct _labels p = {0};
-    if (!_labels_get (&p) || !labels (p))
-      return false;
-  }
-
+  else if (!strcmp (s, "end_translate"))
+    end_translate();
+  
   else if (!strcmp (s, "clear"))
     clear();
-
-  else if (!strcmp (s, "box")) {
-    struct _box p = {0};
-    if (!_box_get (&p) || !box (p))
-      return false;
-  }
-
-  else if (!strcmp (s, "view")) {
-    struct _view_set p = {0};
-    _view_set_get (&p);
-    view (p);
-  }
 
   else if (s[0] != '\n' && s[0] != '\0')
     fprintf (ferr, "load(): syntax error: '%s'\n", s);
 
-  free (buf);
   return true;
 }
 
-bool load (struct _load p) {
-  if (p.file) {
-    p.fp = fopen (p.file, "r");
-    if (!p.fp) {
-      perror (p.file);
+bool load (FILE * fp = NULL, char * file = NULL, Array * buf = NULL)
+{
+  if (file) {
+    fp = fopen (file, "r");
+    if (!fp) {
+      perror (file);
       return false;
     }
   }
 
-  if (p.fp) { // read lines from file
+  if (fp) { // read lines from file
     char line[256];
-    while (fgets (line, 256, p.fp) && process_line (line));
+    while (fgets (line, 256, fp) && process_line (line));
   }
-  else if (p.buf) { // read lines from buffer
+  else if (buf) { // read lines from buffer
     int i = 0;
-    char * s = (char *) p.buf->p;
-    while (i < p.buf->len) {
+    char * s = (char *) buf->p;
+    while (i < buf->len) {
       char * start = s;
-      while (i < p.buf->len && *s != '\n')
+      while (i < buf->len && *s != '\n')
 	s++, i++;
       if (*s == '\n' && ++s > start) {
 	char line[s - start + 1];

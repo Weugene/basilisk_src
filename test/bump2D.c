@@ -13,8 +13,9 @@ int main (int argc, char * argv[])
 
 event init (i = 0)
 {
+  double a = 1., b = 200.;
   foreach()
-    h[] = 0.1 + 1.*exp(-200.*(x*x + y*y));
+    h[] = 0.1 + a*exp(- b*(x*x + y*y));
 }
 
 event logfile (i++) {
@@ -46,6 +47,7 @@ event outputfile (t <= 2.5; t += 2.5/8) {
     assert (fabs(h0 - h[]) < 1e-12);
   }
 #endif
+    dump (file = "dump");
 }
 
 #if _MPI
@@ -63,3 +65,4 @@ event adapt (i++) {
   astats s = adapt_wavelet ({h}, (double[]){1e-3}, LEVEL);
   fprintf (stderr, "# refined %d cells, coarsened %d cells\n", s.nf, s.nc);
 }
+

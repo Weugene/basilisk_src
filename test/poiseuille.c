@@ -1,6 +1,9 @@
 #include "navier-stokes/centered.h"
 
 int main() {
+  size (1. [0]); // space and time are dimensionless
+  DT = HUGE [0];
+  
   origin (0, -0.5);
   stokes = true;
   TOLERANCE = 1e-5;

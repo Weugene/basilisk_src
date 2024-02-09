@@ -58,7 +58,8 @@ coord * input_stl (FILE * fp)
     }
     i = nf;
     while (i > 0) {
-      float x, y, z;
+      float x = 0, y = 0, z = 0;
+      dimensional ((x == Delta, y == Delta, z == Delta));
       unsigned j;
       uint16_t attbytecount;
 
@@ -422,7 +423,7 @@ static void refine_distance (Point point, scalar d)
     is the case then the children and parent must have the same
     orientation. We enforce this, using the "average" orientation. */
 
-    if (fabs(d[]) > sqrt(dimension)*Delta/4.) {
+    if (fabs(d[]) > sqrt(dimension)/4.*Delta) {
       if (abs(s) != 1 << dimension) {
 	s = sign(s);
 	foreach_child()

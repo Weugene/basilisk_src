@@ -12,7 +12,9 @@ static bool check (Ast * n)
 
 Ast * ast_check_grammar (Ast * n, bool recursive)
 {
-  if (n && n->child) {    
+  if (!n)
+    return NULL;
+  if (n->child) {
     if (!check (n)) {
       fprintf (stderr, "\ngrammatical error:\n");
       ast_print_tree (n, stderr, 0, 0, 10);
@@ -23,6 +25,10 @@ Ast * ast_check_grammar (Ast * n, bool recursive)
 	assert ((*c)->parent == n);
 	ast_check_grammar (*c, true);
       }
+  }
+  else {
+    AstTerminal * t = ast_terminal (n);
+    assert (t->file && t->line);
   }
   return n;
 }

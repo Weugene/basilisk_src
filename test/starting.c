@@ -28,6 +28,7 @@ set to unity, and the domain size to 18, so that the corresponding
 levels of refinement are approximately 12 and 16 for $Re=1000$ and
 $Re=9500$, respectively. */
 
+double D = 1.;
 int maxlevel = 12;  // 15/16 for Re = 9500, 12 for Re = 1000
 double Re = 1000;   // or 9500
 double cmax = 3e-3; // 1e-3 for Re = 9500, 3e-3 for Re = 1000
@@ -42,7 +43,9 @@ face vector muv[];
 We set a unit velocity inflow on the left and an outflow on the
 right. */
 
-u.n[left] = dirichlet(1);
+double u0 = 1.;
+
+u.n[left] = dirichlet(u0);
 
 u.n[right] = neumann(0);
 p[right] = dirichlet(0);
@@ -64,14 +67,14 @@ int main (int argc, char * argv[])
   /**
   The domain is $18\times 18$ and only half the cylinder is modelled. */
   
-  size (18);
+  size (18 [1]);
   origin (- L0/2.);
 
   /**
   We set the viscosity field and tune the Poisson solver. */
    
   mu = muv;
-  TOLERANCE = 1e-4;
+  TOLERANCE = 1e-4 [*];
   NITERMIN = 2;
   
   run();
@@ -84,7 +87,7 @@ viscosity is just $1/Re$. */
 
 event properties (i++) {
   foreach_face()
-    muv.x[] = fm.x[]/Re;
+    muv.x[] = fm.x[]*u0*D/Re;
 }
 
 /**
@@ -103,16 +106,15 @@ event init (t = 0)
     Otherwise, we first create a mesh initially refined only around
     the cylinder. */
     
-    refine (level <= maxlevel*(1. - sqrt(fabs(sq(x) + sq(y) - sq(0.5)))/2.));
+    refine (level <= maxlevel*(1. - sqrt(fabs(sq(x) + sq(y) - sq(D/2.)))/2.));
 
     /**
-    Then initialize the embedded boundary with the unit-diameter
-    cylinder. */
+    Then initialize the embedded boundary with cylinder. */
     
-    solid (cs, fs, sq(x) + sq(y) - sq(0.5));
+    solid (cs, fs, sq(x) + sq(y) - sq(D/2.));
     
     foreach()
-      u.x[] = cs[]; // fixme: with 1 this results in sub-optimal adaptation
+      u.x[] = u0*cs[]; // fixme: with 1 this results in sub-optimal adaptation
   }
   else { // restart
 
@@ -120,7 +122,7 @@ event init (t = 0)
     When we restart, we still need to restore the face fraction field
     *fs*, since it is not dumped. */
     
-    solid (cs, fs, sq(x) + sq(y) - sq(0.5));
+    solid (cs, fs, sq(x) + sq(y) - sq(D/2.));
     
   }
 

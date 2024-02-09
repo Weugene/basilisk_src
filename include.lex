@@ -212,7 +212,12 @@ FDECL     {ID}+{SP}*\(
 "}" {
   scope--;
   if (scope < 0) {
-    fprintf (stderr, "%s:%d: warning: mismatched '}'\n", fname, yylineno);
+    if (warninclude)
+      fprintf (stderr, "%s:%d: warning: mismatched '}'\n", fname, yylineno);
+    else {
+      fprintf (stderr, "%s:%d: error: mismatched '}'\n", fname, yylineno);
+      exit (1);
+    }
     scope = 0;
   }
 }
@@ -482,7 +487,6 @@ static int include (char * file, FILE * fin, FILE * fout)
 }
 
 FILE * writepath (char * path, const char * mode);
-void cleanup (int status, const char * dir);
 
 static void compdir (char * file, const char * dir)
 {
@@ -492,7 +496,7 @@ static void compdir (char * file, const char * dir)
     FILE * fin = fopen (path, "r");
     if (fin == NULL) {
       perror (path);
-      cleanup (1, dir);
+      exit (1);
     }
     FILE * fout = NULL;
     if (dir) {
@@ -505,7 +509,7 @@ static void compdir (char * file, const char * dir)
       fout = writepath (out, "w");
       if (fout == NULL) {
 	perror (out);
-	cleanup (1, dir);
+	exit (1);
       }
       free (out);
 
@@ -521,7 +525,7 @@ static void compdir (char * file, const char * dir)
       fputs ("\"\n", fout);
     }
     if (include (path, fin, fout))
-      cleanup (1, dir);
+      exit (1);
     fclose (fin);
     if (fout) {
       fputs ("\n#endif\n", fout);
@@ -541,9 +545,9 @@ static void prepend_path (char * path)
 }
 
 void includes (int argc, char ** argv,
-	      char ** grid1, int * default_grid,
-	      int * dim, int * bg, int * lyrs,
-	      const char * dir)
+	       char ** grid1, int * default_grid,
+	       int * dim, int * bg, int * lyrs,
+	       const char * dir)
 {
   int depend = 0, tags = 0, swig = 0;
   char * file = NULL, * output = NULL;
@@ -578,7 +582,7 @@ void includes (int argc, char ** argv,
 	     (tags || !strcmp (&argv[i][strlen(argv[i]) - 2], ".c"))) {
       if (file) {
 	fprintf (stderr, "usage: include [OPTIONS] FILE.c\n");
-	cleanup (1, dir);
+	exit (1);
       }
       file = argv[i];
     }
@@ -606,7 +610,7 @@ void includes (int argc, char ** argv,
     fdepend = fopen (ndep, "w");
     if (!fdepend) {
       perror (ndep);
-      cleanup (1, dir);
+      exit (1);
     }
     char * page = strstr (output, ".page");
     if (tags && page) {
@@ -629,7 +633,7 @@ void includes (int argc, char ** argv,
     ftags = fopen (ndep, "w");
     if (!ftags) {
       perror (ndep);
-      cleanup (1, dir);
+      exit (1);
     }
   }
   if (file) {
@@ -642,7 +646,7 @@ void includes (int argc, char ** argv,
       if (!swigfp) {
 	fprintf (stderr, "include: could not open '%s': ", swigname);
 	perror ("");
-	cleanup (1, dir);
+	exit (1);
       }
       *dot = '\0';
       fprintf (swigfp, "%%module %s\n", swigname);
@@ -659,7 +663,7 @@ void includes (int argc, char ** argv,
       if (!fp) {
 	fprintf (stderr, "include: invalid grid '%s': ", grid);
 	perror ("");
-	cleanup (1, dir);
+	exit (1);
       }
       fclose (fp);
       target = 0;
@@ -671,7 +675,7 @@ void includes (int argc, char ** argv,
       FILE * fp = openpath (pythonpath, "r", &path);
       if (!fp) {
 	perror (pythonpath);
-	cleanup (1, dir);
+	exit (1);
       }
       fclose (fp);
       target = 0;

@@ -12,8 +12,9 @@ event init (i = 0)
 {
   refine (level == 4 && x < -0.1 && y < -0.1);
 
+  double a = 0.2, b = 100.;
   foreach() {
-    zb[] = 0.2*exp(-100*(x*x + y*y));
+    zb[] = a*exp(-b*(x*x + y*y));
     h[] = 1. - zb[];
   }
 }

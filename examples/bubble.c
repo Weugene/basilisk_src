@@ -64,25 +64,25 @@ We consider two bubbles studied by Cano-Lozano et al, 2016. */
 
 #if BUBBLE19
 // Bubble 19 of Cano-Lozano et al, P.R.Fluids, 2016
-# define Ga 100.8
-# define Bo 4.
-# define MAXTIME 82
+const double Ga = 100.8;
+const double Bo = 4.;
+const double MAXTIME = 82;
 #else
 // Bubble 26 of Cano-Lozano et al, P.R.Fluids, 2016
-# define Ga 100.25
-# define Bo 10.
-# define MAXTIME 110
+const double Ga = 100.25;
+const double Bo = 10.;
+const double MAXTIME = 110;
 #endif
 
 /**
 We choose as length unit the diameter of the bubble. The domain is
-$120^3$. *Z0* is the initial position of the bubble relative to the
+$120^3$. *Zi* is the initial position of the bubble relative to the
 bottom wall. The acceleration of gravity is set to unity, which gives
 a characteristic rise velocity also of order unity, which gives a
 maximum time for the simulation comparable to the domain size. */
 
-#define WIDTH 120.0
-#define Z0 3.5
+const double WIDTH = 120. [1];
+const double Zi = 3.5;
 int LEVEL = 12;
 
 /**
@@ -105,8 +105,8 @@ int main (int argc, char * argv[]) {
   We set the physical parameters: densities, viscosities and surface
   tension. */
   
-  rho1 = 1.;
-  rho2 = 1./RHOR;
+  rho1 = 1. [0];
+  rho2 = rho1/RHOR;
   mu1 = 1./Ga;
   mu2 = 1./(MUR*Ga);
   f.sigma = 1./Bo;
@@ -116,7 +116,7 @@ int main (int argc, char * argv[]) {
   important to minimise mass conservation errors for these simulations
   which are very long. */
   
-  TOLERANCE = 1e-4;
+  TOLERANCE = 1e-4 [*];
   run();
 }
 
@@ -124,13 +124,13 @@ int main (int argc, char * argv[]) {
 For the initial conditions, we first try to restore the simulation
 from a previous "restart", if this fails we refine the mesh locally to
 the maximum level, in a sphere of diameter 1.5 around the bubble. We
-then initialise the volume fraction for a bubble initially at (0,Z0,0)
+then initialise the volume fraction for a bubble initially at (0,Zi,0)
 of diameter unity. */
 
 event init (t = 0) {
   if (!restore (file = "restart")) {
-    refine (sq(x) + sq(y - Z0) + sq(z) - sq(0.75) < 0 && level < LEVEL);
-    fraction (f, sq(x) + sq(y - Z0) + sq(z) - sq(.5));
+    refine (sq(x) + sq(y - Zi) + sq(z) - sq(0.75) < 0 && level < LEVEL);
+    fraction (f, sq(x) + sq(y - Zi) + sq(z) - sq(.5));
   }
 }
 

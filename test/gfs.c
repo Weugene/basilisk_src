@@ -9,8 +9,9 @@ int main()
   
   scalar a[];
   vector u[];
+  double k = 2.*pi;
   foreach()
-    u.x[] = u.y[] = a[] = sin(2.*pi*x)*cos(2.*pi*y);
+    u.x[] = u.y[] = a[] = sin(k*x)*cos(k*y);
 
   FILE * fp = fopen ("gfsi.gfs", "w");
   output_gfs (fp);

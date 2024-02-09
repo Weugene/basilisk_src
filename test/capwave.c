@@ -5,18 +5,24 @@ This is the classical test case first proposed in [Popinet & Zaleski,
 1999](/src/references.bib#popinet1999).
 
 We use a constant-resolution grid, the Navier--Stokes solver with VOF
-interface tracking and surface tension. */
+interface tracking (optionally coupled with levelset) and surface
+tension (optionally using the integral formulation). */
 
 #include "grid/multigrid.h"
 #include "navier-stokes/centered.h"
-#include "vof.h"
-#include "tension.h"
-#include "prosperetti.h"
-
+#if CLSVOF
+# include "two-phase-clsvof.h"
+# include "integral.h"
+# include "curvature.h"
+#else
+# include "vof.h"
+# include "tension.h"
 /**
 The interface is represented by the volume fraction field *c*. */
 
-scalar c[], * interfaces = {c};
+scalar f[], * interfaces = {f};
+#endif
+#include "prosperetti.h"
 
 /**
 We make sure that the boundary conditions for the face-centered
@@ -40,10 +46,15 @@ int main() {
   The domain is 2x2 to minimise finite-size effects. The surface
   tension is one and the viscosity is constant. */
 
-  L0 = 2.;
+  size (2. [1]);
   Y0 = -L0/2.;
-  c.sigma = 1.;
-  TOLERANCE = 1e-6;
+#if CLSVOF
+  const scalar sigma[] = 1.;
+  d.sigmaf = sigma;
+#else
+  f.sigma = 1.;
+#endif
+  TOLERANCE = 1e-6 [*];
   const face vector muc[] = {0.0182571749236, 0.0182571749236};
   mu = muc;
 
@@ -51,7 +62,7 @@ int main() {
   We vary the resolution to check for convergence. */
 
   for (N = 16; N <= 128; N *= 2) {
-    se = ne = 0;
+    se = 0, ne = 0;
     run();
   }
 }
@@ -61,7 +72,13 @@ The initial condition is a small amplitude plane wave of wavelength
 unity. */
 
 event init (t = 0) {
-  fraction (c, y - 0.01*cos (2.*pi*x));
+  double k = 2., a = 0.01;
+#if CLSVOF
+  foreach()
+    d[] = y - a*cos (k*pi*x);
+#else
+  fraction (f, y - a*cos (k*pi*x));
+#endif
 }
 
 /**
@@ -82,7 +99,7 @@ event amplitude (t += 3.04290519077e-3; t <= 2.2426211256) {
   (using height functions) and take the corresponding maximum. */
 
   scalar pos[];
-  position (c, pos, {0,1});
+  position (f, pos, {0,1 [0]});
   double max = statsf(pos).max;
 
   /**
@@ -124,7 +141,8 @@ event gfsview (i += 1) {
 set xlabel 'tau'
 set ylabel 'Relative amplitude'
 plot '../prosperetti.h' u 2:4 w l t "Prosperetti", \
-     'wave-128' every 10 w p t "Basilisk"
+     'wave-128' every 10 w p t "Basilisk", \
+     '../capwave-clsvof/wave-128' every 10 w p t "Basilisk (CLSVOF)"
 ~~~
 
 ~~~gnuplot Convergence of the RMS error as a function of resolution (number of grid points per wavelength)
@@ -133,7 +151,10 @@ set ylabel 'Relative RMS error'
 set logscale y
 set logscale x 2
 set grid
-plot [5:200][1e-4:1]'log' t "Basilisk" w lp, 2./x**2 t "Second order"
+plot [5:200][1e-4:1]\
+     'log' t "Basilisk" w lp, 2./x**2 t "Second order", \
+     '../capwave-clsvof/log' t "Basilisk (CLSVOF)" w lp, \
+     2./x**2 t "Second order"
 ~~~
 
 ## See also

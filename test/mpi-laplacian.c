@@ -74,9 +74,10 @@ int main (int argc, char * argv[])
     exit(1);
   }
 
+  size (1[0]);
   init_grid (N);
   foreach()
-    a[] = b[] = 0.;
+    a[] = 0., b[] = 0.;
   poisson (a, b); // to force allocation of extra fields
   
   MPI_Barrier (MPI_COMM_WORLD);

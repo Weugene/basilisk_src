@@ -23,13 +23,10 @@ More details are given in [Popinet (2020)](/Bibliography#popinet2020). */
 #endif // ML
 
 /**
-The primary parameters are the flow rate, water level, viscosity and bump
-amplitude. */
+The primary parameters are the flow rate, water level, viscosity, bump
+amplitude and ramping time. */
 
-#define QL 1.
-#define HR 0.6
-#define NU 1e-2
-#define BA 0.4
+const double QL = 1., HR = 0.6, NU = 1e-2, BA = 0.4, T0 = 10;
 
 int main()
 {
@@ -37,7 +34,7 @@ int main()
   /**
   The domain is 30 meters long. */
   
-  L0 = 30.;
+  L0 = 30. [1];
   G = 9.81;
   N = 512; // less damping with 1024
 
@@ -101,8 +98,9 @@ We initialise the topography and the initial thickness of each layer *h*. */
 
 event init (i = 0)
 {
+  double a = 5.;
   foreach() {
-    zb[] = BA*exp(- sq(x - 10.)/5.);
+    zb[] = BA*exp(- sq(x - 10.)/a);
 #if !ML
     h[] = HR - zb[];
 #else
@@ -123,12 +121,12 @@ event init (i = 0)
   
 #if !ML
   for (vector u in ul) {
-    u.n[left] = dirichlet (uleft (point, _s, QL*(t < 10. ? t/10. : 1.)));
+    u.n[left] = dirichlet (uleft (point, _s, QL*(t < T0 ? t/T0 : 1.)));
     u.n[right] = neumann(0.);
   }
   h[right] = dirichlet(HR);
 #else
-  u.n[left] = dirichlet (uleft (point, _s, QL*(t < 10. ? t/10. : 1.)));
+  u.n[left] = dirichlet (uleft (point, _s, QL*(t < T0 ? t/T0 : 1.)));
   u.n[right] = neumann(0);
 #endif
 

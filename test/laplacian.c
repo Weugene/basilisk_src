@@ -13,6 +13,7 @@ scalar a[], b[];
 
 int main (int argc, char * argv[])
 {
+  size (1.[0]); // dimensionless
   int start, end;
   if (argc == 1) {
     start = 4; end = 11;

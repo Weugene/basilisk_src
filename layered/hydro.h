@@ -126,7 +126,7 @@ event defaults (i = 0)
   
   CFL = 1./(2.*dimension);
   if (CFL_H == 1e40)
-    CFL_H = 0.5;  
+    CFL_H = 0.5 [0];
   
   u = new vector[nl];
   reset ({u}, 0.);
@@ -162,6 +162,7 @@ event init (i = 0)
     eta[] = zb[];
     foreach_layer()
       eta[] += h[];
+    dimensional (h[] == Delta);
   }
 }
 
@@ -315,7 +316,7 @@ void advect (scalar * tracers, face vector hu, face vector hf, double dt)
     
     for (scalar s in tracers) {
       foreach_face() {
-	double un = dt*hu.x[]/(hf.x[]*Delta + dry), a = sign(un);
+	double un = dt*hu.x[]/((hf.x[] + dry)*Delta), a = sign(un);
 	int i = -(a + 1.)/2.;
 	double g = s.gradient ?
 	  s.gradient (s[i-1], s[i], s[i+1])/Delta :
@@ -359,7 +360,7 @@ void advect (scalar * tracers, face vector hu, face vector hf, double dt)
       double h1 = h[];
       foreach_dimension()
 	h1 += dt*(hu.x[] - hu.x[1])/(Delta*cm[]);
-      if (h1 < - 1e-12)
+      if (h1 < - dry)
 	fprintf (stderr, "warning: h1 = %g < - 1e-12 at %g,%g,%d,%g\n",
 		 h1, x, y, _layer, t);
       h[] = fmax(h1, 0.);
@@ -481,28 +482,26 @@ on the faces of each layer. The slope of the layer interfaces
 $\mathbf{{\nabla}} z_{k+1/2}$ in the second-term is bounded by
 `max_slope` (by default 30 degrees). */
 
-double max_slope = 0.577350269189626; // = tan(30.*pi/180.)
+double max_slope = 0.577350269189626 [0]; // = tan(30.*pi/180.)
 #define slope_limited(dz) (fabs(dz) < max_slope ? (dz) :	\
 			   ((dz) > 0. ? max_slope : - max_slope))
 
-#define hpg(pg,phi,i) {							\
+#define hpg(pg,phi,i,code) do {						\
   double dz = zb[i] - zb[i-1];						\
   foreach_layer() {							\
-    pg = 0.;								\
+    double pg = 0.;							\
     if (h[i] + h[i-1] > dry) {						\
       double s = Delta*slope_limited(dz/Delta);				\
-      pg -= (h[i] + s)*phi[i] - (h[i-1] - s)*phi[i-1];			\
+      pg = (h[i-1] - s)*phi[i-1] - (h[i] + s)*phi[i];                   \
       if (point.l < nl - 1) {						\
 	double s = Delta*slope_limited((dz + h[i] - h[i-1])/Delta);     \
-	pg -= (h[i] - s)*phi[i,0,1] - (h[i-1] + s)*phi[i-1,0,1];	\
+	pg += (h[i-1] + s)*phi[i-1,0,1] - (h[i] - s)*phi[i,0,1];        \
       }									\
       pg *= gmetric(i)*hf.x[i]/(Delta*(h[i] + h[i-1]));			\
-    }
-
-#define end_hpg(i)				\
-    dz += h[i] - h[i-1];			\
-  }						\
-}
+    } code;								\
+    dz += h[i] - h[i-1];						\
+  }									\
+} while (0)
 
 /**
 # Hydrostatic vertical velocity
@@ -662,13 +661,10 @@ double segment_flux (coord segment[2], double * flux, scalar h, vector u)
     for (int i = 0; i < 2; i++) {
       coord a = p[i];
       foreach_layer()
-	flux[_layer] += dl/2.*
-	interpolate_linear (point, (struct _interpolate)
-			    {h, a.x, a.y, 0.})*
-	(m.x*interpolate_linear (point, (struct _interpolate)
-				 {u.x, a.x, a.y, 0.}) +
-	 m.y*interpolate_linear (point, (struct _interpolate)
-				 {u.y, a.x, a.y, 0.}));
+	flux[point.l] += dl/2.*
+	interpolate_linear (point, h, a.x, a.y, 0.)*
+	(m.x*interpolate_linear (point, u.x, a.x, a.y, 0.) +
+	 m.y*interpolate_linear (point, u.y, a.x, a.y, 0.));
     }
   }
   // reduction

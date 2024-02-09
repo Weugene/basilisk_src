@@ -15,7 +15,7 @@ the interface mean curvature. */
 #include "iforce.h"
 #include "curvature.h"
 #ifdef DEBUG_MODE_TENSION
-    scalar my_kappa[];
+    scalar my_kappa[]; // weugene
 #endif
 /**
 The surface tension coefficient is associated to each VOF tracer. */

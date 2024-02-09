@@ -275,19 +275,14 @@ Using tag(), the function below can identify and remove droplets (or
 bubbles) defined by VOF tracer *f* (resp. $1 - f$), smaller than a
 given diameter (*minsize*) expressed in number of cells. */
 
-struct RemoveDroplets {
-  scalar f;         // compulsory
-  int minsize;      // default 3
-  double threshold; // default 1e-4
-  bool bubbles;     // default false
-};
-
-void remove_droplets (struct RemoveDroplets p)
+void remove_droplets (scalar f,
+		      int minsize = 3,
+		      double threshold = 1e-4,
+		      bool bubbles = false)
 {
-  scalar d[], f = p.f;
-  double threshold = p.threshold ? p.threshold : 1e-4;
+  scalar d[];
   foreach()
-    d[] = (p.bubbles ? 1. - f[] : f[]) > threshold;
+    d[] = (bubbles ? 1. - f[] : f[]) > threshold;
   int n = tag (d), size[n];
   for (int i = 0; i < n; i++)
     size[i] = 0;
@@ -297,8 +292,8 @@ void remove_droplets (struct RemoveDroplets p)
 #if _MPI
   MPI_Allreduce (MPI_IN_PLACE, size, n, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 #endif
-  int minsize = pow (p.minsize ? p.minsize : 3, dimension);
+  minsize = pow (minsize, dimension);
   foreach()
     if (d[] > 0 && size[((int) d[]) - 1] < minsize)
-      f[] = p.bubbles;
+      f[] = bubbles;
 }

@@ -14,31 +14,26 @@ electric conductivity and $\phi$ the electric potential. */
 
 extern scalar phi;
 
-struct Species {
-  scalar * c; // A list of the species concentration and their corresponding
-  int * z;    // valences
-  double dt;
-  // optional
-  vector * K; // electric mobility (default the valence)
-};
-
-void ohmic_flux (struct Species sp)
+void ohmic_flux (scalar * c,         // A list of the species concentration...
+		 int * z,            // ... and their corresponding valences
+		 double dt,
+		 vector * K = NULL)  // electric mobility (default the valence)
 {
   /**
   If the volume conductivity is not provided it is set to the value of
   the valence. */
   
-  if (!sp.K) { // fixme: this does not work yet
+  if (!K) { // fixme: this does not work yet
     int i = 0;
-    for (scalar s in sp.c) {
-      const face vector kc[] = {sp.z[i], sp.z[i]}; i++;
-      sp.K = vectors_append (sp.K, kc);
+    for (scalar s in c) {
+      const face vector kc[] = {z[i], z[i]}; i++;
+      K = vectors_append (K, kc); // fixme: K should be freed eventually
     }
   }
 
-  scalar c;
-  (const) face vector K;
-  for (c, K in sp.c, sp.K) {
+  scalar s;
+  (const) face vector k;
+  for (s, k in c, K) {
 
     /**
     The fluxes of each specie through each face due to ohmic transport
@@ -46,7 +41,7 @@ void ohmic_flux (struct Species sp)
 
     face vector f[];
     foreach_face()
-      f.x[] = K.x[]*(c[] + c[-1,0])*(phi[] - phi[-1,0])/(2.*Delta);
+      f.x[] = k.x[]*(s[] + s[-1])*(phi[] - phi[-1])/(2.*Delta);
 
     /**
     The specie concentration is updated using the net amount of that
@@ -55,6 +50,6 @@ void ohmic_flux (struct Species sp)
 
     foreach()
       foreach_dimension()
-        c[] += sp.dt*(f.x[1,0] - f.x[])/Delta;
+        s[] += dt*(f.x[1] - f.x[])/Delta;
   }
 }

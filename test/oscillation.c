@@ -24,64 +24,21 @@ solver with VOF interface tracking and surface tension. */
 # include "tension.h"
 # define cf
 
+#elif COMPRESSIBLE
+
+# include "compressible/two-phase.h"
+# include "compressible/Mie-Gruneisen.h"
+# include "tension.h"
+# include "compressible/tension.h"
+
+double rho1, rho2;
+
 #else // standard centered Navier--Stokes solver
 
 # include "navier-stokes/centered.h"
-# include "vof.h"
+# define FILTERED 1
+# include "two-phase.h"
 # include "tension.h"
-
-/**
-The interface is represented by the volume fraction field *f*. */
-
-scalar f[], * interfaces = {f};
-
-/**
-The density inside the droplet is one and outside 10^-3^. */
-
-#define rho(f) (clamp(f,0.,1.)*(1. - 1e-3) + 1e-3)
-
-/**
-We have the option of using some "smearing" of the density jump. */
-
-#if 0
-#define cf f
-#else
-scalar cf[];
-#endif
-
-/**
-The density is variable. We allocate a new field to store its
-inverse. */
-
-face vector alphav[];
-
-/**
-The density is defined at each timestep via the *properties()* event
-declared by the Navier--Stokes solver. */
-
-event properties (i++) {
-
-  /**
-  When using smearing of the density jump, we initialise *cf* with the
-  vertex-average of *f*. */
-
-#ifndef cf
-  foreach()
-    cf[] = (4.*f[] + 
-	    2.*(f[0,1] + f[0,-1] + f[1,0] + f[-1,0]) +
-	    f[-1,-1] + f[1,-1] + f[1,1] + f[-1,1])/16.;
-#endif
-
-  /**
-  The inverse of the density $\alpha$ is then given by the
-  face-averaged value of *cf* and the arithmetic average of density
-  defined by *rho()*. */
-
-  foreach_face() {
-    double cm = (cf[] + cf[-1])/2.;
-    alphav.x[] = 1./rho(cm);
-  }
-}
 
 #endif // standard centered Navier--Stokes solver
 
@@ -96,15 +53,31 @@ We will vary the level of refinement to study convergence. */
 FILE * fp = NULL;
 int LEVEL;
 
-int main() {
+int main()
+{
 
   /**
   The density is variable. */
 
-#if MOMENTUM
   rho1 = 1, rho2 = 1e-3;
-#else
-  alpha = alphav;
+
+#if COMPRESSIBLE
+  /**
+  The parameters of the EOS for the liquid and gas. */
+  
+  PI1 = 300.;
+  gamma1 = 7.14;
+  gamma2 = 1.4;
+#if 0 // does not work
+  PI2 = PI1;
+  gamma2 = gamma1;
+#endif
+#endif
+
+#if 0
+  double nu1 = 1e-4, nu2 = 1e-4;
+  mu1 = nu1*rho1;
+  mu2 = nu2*rho2;
 #endif
   
   /**
@@ -113,10 +86,11 @@ int main() {
   vary the level of refinement. */
 
   f.sigma = 1.;
-  TOLERANCE = 1e-4;
+  L0 = 0.5 [0];
+  TOLERANCE = 1e-4 [*];
   remove ("error");
   remove ("laplace");
-  for (LEVEL = 5; LEVEL <= 8; LEVEL++) {
+  for (LEVEL = 4; LEVEL <= 7; LEVEL++) {
     N = 1 << LEVEL;
     
     /**
@@ -144,10 +118,22 @@ event init (i = 0) {
 
   fraction (f, D/2.*(1. + 0.05*cos(2.*atan2(y,x))) - sqrt(sq(x) + sq(y)));
 
-#ifndef cf
-  foreach()
-    cf[] = f[];
-#endif
+#if COMPRESSIBLE
+  /**
+  For compressible flows we initialize the densities, pressure and
+  energies. */
+  
+  // fixme: The initial condition for pressure/energy does not respect
+  // the Laplace pressure because the curvature is not constant
+  double p0L = 1, p0 = p0L + f.sigma/D*2;
+  foreach() {
+    frho1[] = rho1*f[];
+    frho2[] = rho2*(1. - f[]);
+    p[]   = p0*f[] + p0L*(1. - f[]);
+    fE1[] = f[]*(p0/(gamma1 - 1.) + PI1*gamma1/(gamma1 - 1.));
+    fE2[] = (1. - f[])*p0L/(gamma2 - 1.);
+  }
+#endif // COMPRESSIBLE
 }
 
 /**
@@ -156,10 +142,10 @@ At each timestep we output the kinetic energy. */
 event logfile (i++; t <= 1) {
   double ke = 0.;
   foreach (reduction(+:ke))
-#if MOMENTUM
-    ke += sq(Delta)*(sq(q.x[]) + sq(q.y[]))/rho[];
+#if MOMENTUM || COMPRESSIBLE
+    ke += dv()*(sq(q.x[]) + sq(q.y[]))/rho[];
 #else
-    ke += sq(Delta)*(sq(u.x[]) + sq(u.y[]))*rho(cf[]);
+    ke += dv()*(sq(u.x[]) + sq(u.y[]))*rho(sf[]);
 #endif
   fprintf (fp, "%g %g %d\n", t, ke, mgp.i);
   fflush (fp);
@@ -212,16 +198,9 @@ event fit (t = end) {
   pclose (fp);
 }
 
-#if 0
-event gfsview (i += 10) {
-  static FILE * fp = popen ("gfsview2D oscillation.gfv", "w");
-  output_gfs (fp);
-}
-#endif
-
 #if TREE
 event adapt (i++) {
-#if MOMENTUM
+#if MOMENTUM || COMPRESSIBLE
   vector u[];
   foreach()
     foreach_dimension()
@@ -256,10 +235,14 @@ f(x)=a+b*x
 fit f(x) 'error' u (log($1)):(log(abs($2)*100.)) via a,b
 f1(x)=a1+b1*x
 fit f1(x) '../oscillation-momentum/error' u (log($1)):(log(abs($2)*100.)) via a1,b1
+f2(x)=a2+b2*x
+fit f2(x) '../oscillation-compressible/error' u (log($1)):(log(abs($2)*100.)) via a2,b2
 plot 'error' u ($1):(abs($2)*100.) t "" w p pt 5 ps 1, \
      '../oscillation-momentum/error' u ($1):(abs($2)*100.) t "" w p pt 7 ps 1, \
+     '../oscillation-compressible/error' u ($1):(abs($2)*100.) t "" w p pt 9 ps 1, \
       exp(f(log(x))) t ftitle(a,b,"standard"), \
-      exp(f1(log(x))) t ftitle(a1,b1,"momentum")
+      exp(f1(log(x))) t ftitle(a1,b1,"momentum"), \
+      exp(f2(log(x))) t ftitle(a2,b2,"compressible")
 ~~~
 
 The amount of numerical damping can be estimated by computing an
@@ -280,7 +263,8 @@ set ylabel 'Equivalent Laplace number'
 set grid
 set key bottom right
 plot 'laplace' t "standard" w p pt 5 ps 1, \
-     '../oscillation-momentum/laplace' t "momentum" w p pt 7 ps 1
+     '../oscillation-momentum/laplace' t "momentum" w p pt 7 ps 1, \
+     '../oscillation-compressible/laplace' t "compressible" w p pt 9 ps 1
 ~~~
 
 ## See also

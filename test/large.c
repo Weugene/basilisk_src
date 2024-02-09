@@ -48,10 +48,11 @@ int main()
 
 event init (i = 0)
 {
+  double k = 2.*pi, a = 0.07;
   foreach() {
     zb[] = - 0.5;
     foreach_layer()
-      h[] = (0.07*cos(2.*pi*x) - zb[])/nl;
+      h[] = (a*cos(k*x) - zb[])/nl;
   }
 }
 
@@ -89,7 +90,7 @@ event gnuplot (i += 1) {
 
 event logfile (i++)
 {
-  double wmax = 0., smax = 0.;
+  double wmax = 0., smax = 0.[0];
   foreach (reduction (max:wmax) reduction (max:smax)) {
     double Hm = 0., Hp = 0.;
     foreach_layer() {

@@ -163,8 +163,9 @@ fi
 
 function is_not_bot()
 {
+    # echo "checking for bot: $HTTP_USER_AGENT" >&2
     # try to guess whether the client is an indexing robot
-    if [[ "$HTTP_USER_AGENT" =~ [Bb]ot[s]*[^a-zA-Z] ]]; then
+    if [[ "$HTTP_USER_AGENT" =~ [Bb]ot[s]* ]]; then
 	echo "Access denied for bot: $HTTP_USER_AGENT" >&2
 	cat <<EOF
 Content-Type: text/html; charset=utf-8
@@ -192,7 +193,7 @@ if [[ "$REQUEST_URI" == *\?changes=* ]] && is_not_bot; then
     echo "X-Robots-Tag: noindex"
     echo -e "Content-type: text/html; charset=utf-8\n"
     # replace --match "date $hash with --hash=$hash for darcs version 2.12
-    ( cd $DOCUMENT_ROOT && darcs changes --verbose --match "date $hash" \
+    ( cd $DOCUMENT_ROOT && timeout 60 darcs changes --verbose --match "date $hash" \
 				 --repodir=$DOCUMENT_ROOT ) | \
 	awk -v basename="$basename" -f $BASILISK/darcsit/changes2html.awk |   \
 	$PANDOCT -s -V wikititle="$WIKI_TITLE"		    \
@@ -306,7 +307,7 @@ if [[ "$REQUEST_URI" == *\?history ]] && is_not_bot; then
 	tabs="$tabs<li><a href=\"/_edit${REQUEST_URI%%\?*}\">edit</a></li>"
     fi
     tabs="$tabs<li class=selected><a href=\"${REQUEST_URI}\">history</a></li>"
-    ( cd "$DOCUMENT_ROOT" && darcs changes \
+    ( cd "$DOCUMENT_ROOT" && timeout 60 darcs changes \
 	--max-count=50 --repodir=$DOCUMENT_ROOT $basename ) | \
 	dhistory ${REQUEST_URI%%\?*} |                        \
 	$PANDOCT -s -V wikititle="$WIKI_TITLE"		    \
@@ -333,7 +334,7 @@ if [[ "$basename" == _activity* ]] && is_not_bot; then
 	  user=$(echo $user | sed 's/%20/ /g')
 	  echo "# Recent changes by $user"
       fi
-      ( cd "$DOCUMENT_ROOT" && darcs changes \
+      ( cd "$DOCUMENT_ROOT" && timeout 60 darcs changes \
 	    --match "author \"$user\" && date \"in the last month\"" \
 	    --max-count=50 --verbose --repodir="$DOCUMENT_ROOT" ) | dhistory ) |\
 	$PANDOCT -s -V wikititle="$WIKI_TITLE"		      \
@@ -1545,7 +1546,7 @@ if [[ -f "${file%%\?*}" ]]; then
 	    echo "Accept-Ranges: 0-$size"
 	    echo "Content-Range: bytes $start-$end/$size"
             echo "Content-Length: $length"
-	    echo	    
+	    echo
 	    tail -c +$start "$file" 2> /dev/null | head -c $length
 	else
  	    echo "$type"

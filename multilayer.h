@@ -66,7 +66,10 @@ boundary and no-slip on the bottom boundary i.e. $\dot{u}_t = 0$,
 $\lambda_b = 0$, $u_b = 0$. */
 
 double nu = 0.;
-(const) scalar lambda_b = zeroc, dut = zeroc, u_b = zeroc;
+const scalar lambda0[] = 0, dut0[] = 0, u_b0[] = 0;
+(const) scalar lambda_b = lambda0, dut = dut0, u_b = u_b0;
+// fixme: should be able to replace the two lines above with:
+// (const) scalar lambda_b[] = 0, dut[] = 0, u_b[] = 0;
 
 /**
 For stability, we discretise the viscous friction term implicitly as

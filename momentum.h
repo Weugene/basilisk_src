@@ -24,6 +24,13 @@ event defaults (i = 0) {
   alpha = alphav;
   rho = rhov;
   mu = muv;
+
+  /**
+  We use (strict) minmod slope limiting for all components. */
+
+  theta = 1.;
+  foreach_dimension()
+    q.x.gradient = minmod2;
 }
 
 /**
@@ -39,12 +46,11 @@ averages (i.e. harmonic). */
 #endif
 
 event properties (i++) {
-  // fixme: metric
   foreach()
-    rhov[] = rho(f[]);
+    rhov[] = rho(f[])*cm[];
   foreach_face () {
-    alphav.x[] = 2./(rhov[] + rhov[-1]);
     double ff = (f[] + f[-1])/2.;
+    alphav.x[] = fm.x[]/rho(ff);
     muv.x[] = fm.x[]*mu(ff);
   }
 }
@@ -71,15 +77,21 @@ event vof (i++) {
 
   /**
   Momentum $q2$ is associated with $1 - f$, so we set the *inverse*
-  attribute to *true*. We use (strict) minmod slope limiting for all
-  components. */
+  attribute to *true*. We use the same limiting for q1 and q2. */
 
-  theta = 1.;
   foreach_dimension() {
     q2.x.inverse = true;
-    q1.x.gradient = q2.x.gradient = minmod2;
+    q2.x.gradient = q1.x.gradient;
   }
 
+#if TREE
+  /**
+  The refinement function is modified by *vof_advection()*. To be able
+  to restore it, we store its value. */
+  
+  void (* refine) (Point, scalar) = q1.x.refine;
+#endif
+  
   /**
   We associate the transport of $q1$ and $q2$ with $f$ and transport
   all fields consistently using the VOF scheme. */
@@ -96,6 +108,16 @@ event vof (i++) {
   foreach()
     foreach_dimension()
       q.x[] = q1.x[] + q2.x[];
+
+#if TREE
+  /**
+  We restore the refinement function for the total momentum. */
+  
+  for (scalar s in {q}) {
+    s.refine = s.prolongation = refine;
+    s.dirty = true;
+  }
+#endif // TREE  
 
   /**
   We set the list of interfaces to NULL so that the default *vof()*

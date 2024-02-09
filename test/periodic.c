@@ -3,6 +3,7 @@
 
 int main()
 {
+  size (1.[0]);
   init_grid (N);
   scalar a[], b[], e[];
 

@@ -20,6 +20,7 @@ double divmax (face vector uf)
 
 int main()
 {
+  size (1.[0]);
   init_grid(8);
 
   origin (-0.5,-0.5,-0.5);

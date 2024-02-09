@@ -8,7 +8,14 @@ Same as [poiseuille-periodic.c]() but axisymmetric. */
 
 int main() {
   periodic (right);
+
+  /**
+  Space and time are dimensionless. This is necessary to be able to
+  use the 'mu = fm' trick. */
   
+  size (1. [0]);
+  DT = HUGE [0];
+
   TOLERANCE = 1e-6;
 
   u.t[top] = dirichlet(0);

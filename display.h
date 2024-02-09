@@ -84,7 +84,7 @@ display ("squares (color = 'u.x', spread = -1);", true);
 #endif
 
 #include <netdb.h>
-#include <wsServer/include/ws.h>
+#include "wsServer/include/ws.h"
 #pragma autolink -L$BASILISK/wsServer -lws
 
 #include "view.h"
@@ -433,27 +433,23 @@ static DisplayControl * display_control_lookup (const char * name)
   return NULL;
 }
 
-struct _DisplayControl {
-  void * ptr;
-  double min, max;
-  char * name, * tooltip, * ptr_name;
-  int size;
-};
-
-void display_control_internal (struct _DisplayControl p)
+void display_control_internal (void * ptr,
+			       double min, double max,
+			       char * name = NULL, char * tooltip = NULL,
+			       char * ptr_name, int size)
 {
   DisplayControl d;
-  if (!p.name)
-    p.name = p.ptr_name;
+  if (!name)
+    name = ptr_name;
 
-  if (display_control_lookup (p.name))
+  if (display_control_lookup (name))
     return;
     
-  d.name = strdup (p.name);
-  d.tooltip = p.tooltip ? strdup (p.tooltip) : NULL;
-  d.ptr = p.ptr;
-  d.size = p.size;
-  d.min = p.min, d.max = p.max;
+  d.name = strdup (name);
+  d.tooltip = tooltip ? strdup (tooltip) : NULL;
+  d.ptr = ptr;
+  d.size = size;
+  d.min = min, d.max = max;
   array_append (Display.controls, &d, sizeof (DisplayControl));
 
   if (pid() == 0) {
@@ -502,11 +498,10 @@ static char * bview_interface_json()
 
   JSON_BUILD ("{\n");
   
-  char p[4096] = {0};
   int i = 0;
   while (bview_interface[i].json) {
     JSON_BUILD ("%s", i ? ",\n" : "");
-    len += bview_interface[i].json (p, build + len, 4096);
+    len += bview_interface[i].json (build + len, 4096);
     build = realloc (build, len + 4096);
     JSON_BUILD ("\n");
     i++;
@@ -706,7 +701,12 @@ void display_url (FILE * fp)
   hostname[1023] = '\0';
   gethostname (hostname, 1023);
   struct hostent * h = gethostbyname (hostname);
-  fprintf (fp, DISPLAY_JS "?ws://%s:%d", h->h_name, Display.port);
+  if (!h)
+    fprintf (stderr,
+	     "display_url(): warning: gethostbyname(\"%s\") returned NULL\n",
+	     hostname);
+  fprintf (fp, DISPLAY_JS "?ws://%s:%d", h ? h->h_name : "127.0.0.1",
+	   Display.port);
 }
 
 int display_usage = 20; // use 20% of runtime, maximum
@@ -769,10 +769,14 @@ void display_init()
     }
 
     FILE * fp = fopen ("display.html", "w");
-    fputs ("<head><meta http-equiv=\"refresh\" content=\"0;URL=", fp);
-    display_url (fp);
-    fputs ("\"></head>\n", fp);
-    fclose (fp);
+    if (!fp)
+      perror ("display.html");
+    else {
+      fputs ("<head><meta http-equiv=\"refresh\" content=\"0;URL=", fp);
+      display_url (fp);
+      fputs ("\"></head>\n", fp);
+      fclose (fp);
+    }
   }
 
   Display.objects = kh_init (strhash);

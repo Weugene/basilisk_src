@@ -46,56 +46,52 @@ void clear()
 * *cache*: the maximum number of cached compiled expressions.
 */
 
-struct _view_set {
-  float tx, ty;
-  float fov;
-  float quat[4];
-  float sx, sy, sz;
-  unsigned width, height, samples;
-  float bg[3];
-  float theta, phi, psi;
-  bool relative;
-  float tz, near, far;
-  float res;
-  char * camera;
-  void (* map) (coord *);
-  int cache;
-  float p1x, p1y, p2x, p2y; // for trackball
-  bview * view;
-};
-
-void view (struct _view_set p)
+void view (float tx = 0., float ty = 0.,
+	   float fov = 0.,
+	   float quat[4] = {0},
+	   float sx = 1., float sy = 1., float sz = 1.,
+	   unsigned width = 800, unsigned height = 800, unsigned samples = 4,
+	   float bg[3] = {0},
+	   float theta = 0., float phi = 0., float psi = 0.,
+	   bool relative = false,
+	   float tz = 0., float near = 0., float far = 0.,
+	   float res = 0.,
+	   char * camera = NULL,
+	   MapFunc map = NULL,
+	   int cache = 0,
+	   float p1x = 0., float p1y = 0., float p2x = 0., float p2y = 0.,
+	   bview * view1 = NULL)
 {
-  bview * v = p.view ? p.view : get_view();
-  if (p.fov) {
-    if (p.relative)
-      v->fov += (0.1 + 3.*v->fov)*p.fov;
+  bview * v = view1 ? view1 : get_view();
+  if (fov) {
+    if (relative)
+      v->fov += (0.1 + 3.*v->fov)*fov;
     else
-      v->fov = p.fov;
+      v->fov = fov;
     v->fov = clamp(v->fov,0.01,100.);
   }
   for (int i = 0; i < 4; i++)
-    if (p.quat[i]) {
+    if (quat[i]) {
       for (int j = 0; j < 4; j++)
-	v->quat[j] = p.quat[j];
+	v->quat[j] = quat[j];
       break;
     }
-  if (p.tx) v->tx = p.relative ? v->tx + p.tx*0.02*(0.01 + 3.*v->fov) : p.tx;
-  if (p.ty) v->ty = p.relative ? v->ty + p.ty*0.02*(0.01 + 3.*v->fov) : p.ty;
-  if (p.sx) v->sx = p.sx;
-  if (p.sy) v->sy = p.sy;
-  if (p.sz) v->sz = p.sz;
-  if (p.bg[0] || p.bg[1] || p.bg[2])
+  v->tx = relative ? v->tx + tx*0.02*(0.01 + 3.*v->fov) : tx;
+  v->ty = relative ? v->ty + ty*0.02*(0.01 + 3.*v->fov) : ty;
+  v->sx = sx;
+  v->sy = sy;
+  v->sz = sz;
+  if (bg[0] || bg[1] || bg[2])
     for (int i = 0; i < 3; i++)
-      v->bg[i] = p.bg[i];
+      v->bg[i] = bg[i];
   
-  if (p.camera) {
+  if (camera) {
     v->gfsview = false;
-    if (strlen(p.camera) >= 4 &&
-	!strcmp (&p.camera[strlen(p.camera) - 4], ".gfv")) {
-      FILE * fp = fopen (p.camera, "r");
+    if (strlen(camera) >= 4 &&
+	!strcmp (&camera[strlen(camera) - 4], ".gfv")) {
+      FILE * fp = fopen (camera, "r");
       if (!fp) {
-	perror (p.camera);
+	perror (camera);
 	exit (1);
       }
       char s[81];
@@ -109,7 +105,7 @@ void view (struct _view_set p)
 	  nf = sscanf (s, "  fov = %f", &fov);
       }
       if (nq != 4 || nf != 1) {
-	fprintf (stderr, "%s: not a valid gfv file\n", p.camera);
+	fprintf (stderr, "%s: not a valid gfv file\n", camera);
 	exit (1);
       }
       for (int j = 0; j < 4; j++)
@@ -117,76 +113,76 @@ void view (struct _view_set p)
       v->fov = fov;
       v->gfsview = true;
     }
-    else if (!strcmp (p.camera, "left"))
+    else if (!strcmp (camera, "left"))
       gl_axis_to_quat ((float[]){0,1,0}, - pi/2., v->quat);
-    else if (!strcmp (p.camera, "right"))
+    else if (!strcmp (camera, "right"))
       gl_axis_to_quat ((float[]){0,1,0}, pi/2., v->quat);
-    else if (!strcmp (p.camera, "top"))
+    else if (!strcmp (camera, "top"))
       gl_axis_to_quat ((float[]){1,0,0}, - pi/2., v->quat);
-    else if (!strcmp (p.camera, "bottom"))
+    else if (!strcmp (camera, "bottom"))
       gl_axis_to_quat ((float[]){1,0,0}, pi/2., v->quat);
-    else if (!strcmp (p.camera, "front"))
+    else if (!strcmp (camera, "front"))
       gl_axis_to_quat ((float[]){0,0,1}, 0., v->quat);
-    else if (!strcmp (p.camera, "back"))
+    else if (!strcmp (camera, "back"))
       gl_axis_to_quat ((float[]){0,1,0}, pi, v->quat);
-    else if (!strcmp (p.camera, "iso")) {
+    else if (!strcmp (camera, "iso")) {
       gl_axis_to_quat ((float[]){0,1,0}, pi/4., v->quat);
       float q[4];
       gl_axis_to_quat ((float[]){1,0,0}, - pi/4., q);
       gl_add_quats(q, v->quat, v->quat);
     }
     else {
-      fprintf (stderr, "view(): unknown camera '%s'\n", p.camera);
+      fprintf (stderr, "view(): unknown camera '%s'\n", camera);
       exit (1);
     }
   }
-  else if (p.theta || p.phi || p.psi) {
+  else if (theta || phi || psi) {
     v->gfsview = false;
     float q[4];
-    gl_axis_to_quat ((float[]){1,0,0}, - p.phi, q);
-    if (p.relative) {
+    gl_axis_to_quat ((float[]){1,0,0}, - phi, q);
+    if (relative) {
       float q1[4];
-      gl_axis_to_quat ((float[]){0,1,0}, p.theta, q1);
+      gl_axis_to_quat ((float[]){0,1,0}, theta, q1);
       gl_add_quats(q, q1, q1);
       float q2[4];
-      gl_axis_to_quat ((float[]){0,0,1}, p.psi, q2);
+      gl_axis_to_quat ((float[]){0,0,1}, psi, q2);
       gl_add_quats(q1, q2, q2);
       gl_add_quats(q2, v->quat, v->quat);
     }
     else {
-      gl_axis_to_quat ((float[]){0,1,0}, p.theta, v->quat);
+      gl_axis_to_quat ((float[]){0,1,0}, theta, v->quat);
       gl_add_quats(q, v->quat, v->quat);
-      gl_axis_to_quat ((float[]){0,0,1}, p.psi, q);
+      gl_axis_to_quat ((float[]){0,0,1}, psi, q);
       gl_add_quats(q, v->quat, v->quat);
     }
   }
 
-  if (p.map)
-    v->map = p.map;
+  if (map)
+    v->map = map;
   
-  if (p.p1x || p.p1y || p.p2x || p.p2y) { // trackball
+  if (p1x || p1y || p2x || p2y) { // trackball
     float q[4];
-    gl_trackball(q, p.p1x, p.p1y, p.p2x, p.p2y);
+    gl_trackball(q, p1x, p1y, p2x, p2y);
     gl_add_quats (q, v->quat, v->quat);
   }
 
-  if (p.far > p.near) {
-    v->tz = p.tz;
-    v->far = p.far;
-    v->near = p.near;
+  if (far > near) {
+    v->tz = tz;
+    v->far = far;
+    v->near = near;
   }
   
-  if (p.res)
-    v->res = p.res;
+  if (res)
+    v->res = res;
   
-  if ((p.width && p.width != v->width) ||
-      (p.height && p.height != v->height) ||
-      (p.samples && p.samples != v->samples)) {
+  if ((width && width != v->width) ||
+      (height && height != v->height) ||
+      (samples && samples != v->samples)) {
     v->width = v->width/v->samples;
     v->height = v->height/v->samples;
-    if (p.width) v->width = p.width;
-    if (p.height) v->height = p.height;
-    if (p.samples) v->samples = p.samples;
+    if (width) v->width = width;
+    if (height) v->height = height;
+    if (samples) v->samples = samples;
     v->width *= v->samples;
     v->height *= v->samples;
     framebuffer_destroy (v->fb);
@@ -200,9 +196,9 @@ void view (struct _view_set p)
     enable_fpe (FE_DIVBYZERO|FE_INVALID);    
   }
 
-  if (p.cache > 0) {
+  if (cache > 0) {
     v->cache = calloc (1, sizeof (cexpr));
-    v->maxlen = p.cache;
+    v->maxlen = cache;
   }
   
   clear();
@@ -214,16 +210,12 @@ void view (struct _view_set p)
 The block following this command will be drawn in a translated
 coordinate system. */
 
-struct _translate {
-  float x, y, z;
-};
-
-void begin_translate (struct _translate p)
+void begin_translate (float x = 0, float y = 0., float z = 0.)
 {
   bview * view = draw();
   glMatrixMode (GL_MODELVIEW);
   glPushMatrix();
-  glTranslatef (p.x, p.y, p.z);
+  glTranslatef (x, y, z);
   gl_get_frustum (&view->frustum);
 }
 
@@ -243,25 +235,20 @@ symmetric relative to the given plane. The plane is given by $n$ and
 $\alpha$ as explained in
 [squares()](#squares-displays-colormapped-fields). */
 
-struct _mirror {
-  coord n;
-  double alpha;
-};
-
-void begin_mirror (struct _mirror p)
+void begin_mirror (coord n = {0}, double alpha = 0.)
 {
   bview * view = draw();
   glMatrixMode (GL_MODELVIEW);
   glPushMatrix();
-  normalize (&p.n);
+  normalize (&n);
   GLfloat s[16], t[16];
-  s[0] = 1. - 2.*p.n.x*p.n.x;
-  s[1] = - 2.*p.n.x*p.n.y;  s[2] = - 2.*p.n.x*p.n.z;
+  s[0] = 1. - 2.*n.x*n.x;
+  s[1] = - 2.*n.x*n.y;  s[2] = - 2.*n.x*n.z;
   s[3] = 0.;
   s[4] = s[1];
-  s[5] = 1. - 2.*p.n.y*p.n.y; s[6] = - 2.*p.n.y*p.n.z;
+  s[5] = 1. - 2.*n.y*n.y; s[6] = - 2.*n.y*n.z;
   s[7] = 0.;
-  s[8] = s[2];   s[9] = s[6];  s[10] = 1. - 2.*p.n.z*p.n.z; 
+  s[8] = s[2];   s[9] = s[6];  s[10] = 1. - 2.*n.z*n.z; 
   s[11] = 0.;
   s[12] = 0.;    s[13] = 0.;   s[14] = 0.;                    
   s[15] = 1.;
@@ -269,9 +256,9 @@ void begin_mirror (struct _mirror p)
   t[0] = 1.;  t[1] = 0.;   t[2] = 0.;  t[3] = 0.;
   t[4] = 0.;  t[5] = 1.;   t[6] = 0.;  t[7] = 0.;
   t[8] = 0.;  t[9] = 0.;   t[10] = 1.; t[11] = 0.;
-  t[12] = - 2.*p.n.x*p.alpha; 
-  t[13] = - 2.*p.n.y*p.alpha;  
-  t[14] = - 2.*p.n.z*p.alpha; 
+  t[12] = - 2.*n.x*alpha; 
+  t[13] = - 2.*n.y*alpha;  
+  t[14] = - 2.*n.z*alpha; 
   t[15] = 1.;
   matrix_multiply (s, t);
   glMultMatrixf (s);
@@ -352,19 +339,19 @@ static void glnormal3d (bview * view, double x, double y, double z) {
 }
 
 @def foreach_visible_plane(view, n1, alpha1)
-coord n = {(n1).x, (n1).y, (n1).z};
+coord _n = {(n1).x, (n1).y, (n1).z};
 double _alpha = 0.9999999*(alpha1);
 {
-  double norm = sqrt(sq(n.x) + sq(n.y) + sq(n.z));
+  double norm = sqrt(sq(_n.x) + sq(_n.y) + sq(_n.z));
   if (!norm)
-    n.z = 1.;
+    _n.z = 1.;
   else
-    n.x /= norm, n.y /= norm, n.z /= norm, _alpha /= norm;
+    _n.x /= norm, _n.y /= norm, _n.z /= norm, _alpha /= norm;
 }
-glnormal3d (view, n.x, n.y, n.z); // do not use normal inversion
+glnormal3d (view, _n.x, _n.y, _n.z); // do not use normal inversion
 foreach_cell() {
   // fixme: coordinate mapping
-  double _r = Delta*0.87, alpha = (_alpha - n.x*x - n.y*y - n.z*z)/Delta;
+  double _r = Delta*0.87, alpha = (_alpha - _n.x*x - _n.y*y - _n.z*z)/Delta;
   if (fabs(alpha) > 0.87 ||
       (VertexBuffer.visible &&
        !sphere_in_frustum (x, y, z, _r, &(view)->frustum)))
@@ -405,8 +392,8 @@ static void end_draw_lines()
 }
 
 static inline double interp (Point point, coord p, scalar col) {
-  struct _interpolate _r = { col, x + p.x*Delta, y + p.y*Delta, z + p.z*Delta };
-  return interpolate_linear (point, _r);
+  return interpolate_linear (point, col,
+			     x + p.x*Delta, y + p.y*Delta, z + p.z*Delta);
 }
 
 static double evaluate_expression (Point point, Node * n)
@@ -533,8 +520,10 @@ static scalar compile_expression (char * expr, bool * isexpr)
   }
   if (node->type == 'v' && node->e[0] == NULL) {
     scalar s = {node->s};
-    free_node (node);
-    return s;
+    if (s.block > 0) {
+      free_node (node);
+      return s;
+    }
   }
   s = new scalar;
   free (s.name);
@@ -551,58 +540,65 @@ static scalar compile_expression (char * expr, bool * isexpr)
   return s;
 }
 
-#define colorize_args(args)						\
+#define colorize_args()							\
   scalar col = {-1};							\
-  if (args.color && strcmp (args.color, "level")) {			\
-    col = compile_expression (args.color, &args.expr);			\
+  if (color && strcmp (color, "level")) {				\
+    col = compile_expression (color, &expr);				\
     if (col.i < 0)							\
       return false;							\
     boundary ({col});							\
   }									\
 									\
   double cmap[NCMAP][3];						\
-  if (args.color) {							\
-    if (args.min == 0 && args.max == 0) {				\
+  if (color) {								\
+    if (min == 0 && max == 0) {						\
       if (col.i < 0) /* level */					\
-	args.min = 0, args.max = depth();				\
+	min = 0, max = depth();						\
       else {								\
 	stats s = statsf (col);						\
 	double avg = s.sum/s.volume;					\
-	if (args.spread < 0.)						\
-	  args.min = s.min, args.max = s.max;				\
+	if (spread < 0.)						\
+	  min = s.min, max = s.max;					\
 	else {								\
-	  if (!args.spread) args.spread = 5.;				\
-	  double spread = args.spread*s.stddev;				\
-	  args.min = avg - spread; args.max = avg + spread;		\
+	  if (!spread) spread = 5.;					\
+	  min = avg - spread*s.stddev; max = avg + spread*s.stddev;	\
 	}								\
       }									\
     }									\
-    if (!args.map)							\
-      args.map = jet;							\
-    args.map (cmap);							\
+    if (!map)								\
+      map = jet;							\
+    (* map) (cmap);							\
   }									\
   									\
-  if ((dimension > 2 || args.linear) &&					\
-      !args.fc[0] && !args.fc[1] && !args.fc[2])			\
-    args.fc[0] = args.fc[1] = args.fc[2] = 1.;
+  if ((dimension > 2 || linear) &&					\
+      !fc[0] && !fc[1] && !fc[2])					\
+    fc[0] = fc[1] = fc[2] = 1.;						\
+									\
+  if (cbar)								\
+    colorbar (map, size, pos, label, lscale, min, max,			\
+	      horizontal, border, mid,					\
+	      lc, lw, fsize, format, levels);
 
-#define color_facet(args)						\
-  if (args.color && (!args.linear || col.i < 0)) {			\
-    color b = colormap_color (cmap, col.i < 0 ?				\
+#define color_facet()							\
+  if (color && (!linear || col.i < 0)) {				\
+    Color b = colormap_color (cmap, col.i < 0 ?				\
 			      (double) level : val(col,0,0,0),		\
-			      args.min, args.max);			\
+			      min, max);				\
     glColor3f (b.r/255., b.g/255., b.b/255.);				\
   }
 
-#define color_vertex(args, val)						\
-  if (args.color && args.linear && col.i >= 0) {			\
+#define color_vertex(val)						\
+  if (color && linear && col.i >= 0) {					\
     if (VertexBuffer.color) {						\
-      color b = colormap_color (cmap, val, args.min, args.max);		\
+      Color b = colormap_color (cmap, val, min, max);			\
       glColor3f (b.r/255., b.g/255., b.b/255.);				\
     }									\
     else {								\
       double _v = val;							\
-      glTexCoord1d (clamp(((_v) - args.min)/(args.max - args.min), 0., 1.)); \
+      if (max > min)							\
+	glTexCoord1d (clamp(((_v) - min)/(max - min), 0., 1.));		\
+      else								\
+	glTexCoord1d (0.);						\
     }									\
   }
 
@@ -613,7 +609,7 @@ static void begin_colorized (float fc[3], bool constant_color,
   if (use_texture) {
     GLfloat texture[3*256];
     for (int i = 0; i < 256; i++) {
-      color j = colormap_color (cmap, i/255., 0, 1);
+      Color j = colormap_color (cmap, i/255., 0, 1);
       texture[3*i] = j.r/255.;
       texture[3*i + 1] = j.g/255.;
       texture[3*i + 2] = j.b/255.;
@@ -633,50 +629,169 @@ static void end_colorized() {
   glDisable (GL_TEXTURE_1D);
 }
 
-#define colorize() colorized (p.fc, !VertexBuffer.color || !p.color,	\
+#define colorize() colorized (fc, !VertexBuffer.color || !color,	\
 			      cmap, !VertexBuffer.color &&		\
-			      p.color && p.linear && col.i >= 0)
+			      color && linear && col.i >= 0)
 
 /**
-# *draw_vof()*: displays VOF-reconstructed interfaces
+# *colorbar()*: draws a colorbar.
 
-* *c*: the name (as a string) of the Volume-Of-Fluid field.
-* *s*: the (optional) name of the face fraction field.
-* *edges*: whether to display the edges or the facets.
-* *larger*: makes each cell larger by this factor. This helps close
-   the gaps in the VOF interface representation. Default is 1.1 in 3D
-   and when edges are not displayed, otherwise it is 1.
-* *filled*: in 2D, whether to fill the inside (1) or outside (-1).
-* *color*: use this field to color each interface fragment.
-* *min*, *max*: the minimum and maximum values to use for color mapping.
-* *spread*: the "spread factor" to use if *min* and *max* are not
-   defined. The maximum and minimum values will be taken as the average
-   plus or minus *spread* times the standard deviation. Default is 5. If
-   negative, the minimum and maximum values of the field are used.
-* *linear*: if *true* the color will be linearly interpolated for each
-   vertex of the facet.
-* *map*: the colormap to use. Default is *jet*.
-* *fc[]*: an array of red, green, blue values between 0 and 1 which
-  defines the facet color.
-* *lc[]*: an array of red, green, blue values between 0 and 1 which
-  defines the line color.
+* *map*: the colormap.
+* *size*: the size.
+* *pos*: the relative screen position (default is lower-left corner).
+* *label*: a label.
+* *lscale*: the label scale factor.
+* *min*, *max*: the range.
+* *horizontal*: true for anb horizontal colorbar.
+* *border*: adds a border.
+* *mid*: adds a mid-value label.
+* *lc*: the line color.
 * *lw*: the line width.
-*/
+* *fsize*: another size.
+* *format*: how to format numbers.
+* *levels*: the number of subdivisions.
 
-struct _draw_vof {
-  char * c;
-  char * s;
-  bool edges;
-  double larger;
-  int filled;
+Note that this cannot be used with [jview](jview/README) (yet) because
+it mixes surface and line rendering. */
 
-  char * color;
-  double min, max, spread;
-  bool linear;
-  colormap map;
-  float fc[3], lc[3], lw;
-  bool expr;
-};
+trace
+bool colorbar (Colormap map = jet, float size = 15, float pos[2] = {-.95, -.95},
+	       char * label = "", double lscale = 1, double min = -HUGE,
+	       double max = HUGE, bool horizontal = false, bool border = false,
+	       bool mid = false, float lc[3] = {0}, float lw = 3, float fsize = 50,
+	       char * format = "%g", int levels = 50)
+{
+  bview * view = draw();
+  glDisable (GL_LIGHTING);
+  glMatrixMode (GL_PROJECTION);
+  glPushMatrix();
+  glLoadIdentity();
+  glMatrixMode (GL_MODELVIEW);
+  glPushMatrix();
+  glLoadIdentity();
+  
+  float fheight = gl_StrokeHeight();
+  if (!size)
+    size = 15;
+  float width  = 2./size;
+  if (levels < 1) levels = 1;
+  float h = 0, height = 4*width, dh = height/levels;
+  glTranslatef (pos[0], pos[1], 0);
+  
+  // The colorbar itself
+  double cmap [NCMAP][3];
+  (* map) (cmap);
+  glBegin(GL_QUADS);
+  for (int i = 0; i < levels; i++) {
+    Color c = colormap_color (cmap, (float)i/(levels - 1), 0, 1);
+    glColor3f (c.r/255., c.g/255., c.b/255.);
+    if (horizontal) {
+      glVertex2d (h + dh, 0);
+      glVertex2d (h + dh, width);
+      glVertex2d (h, width);
+      glVertex2d (h, 0);
+    } else {
+      glVertex2d (0, h + dh);
+      glVertex2d (width, h + dh);
+      glVertex2d (width, h);
+      glVertex2d (0, h);
+    }
+    h += dh;
+    view->ni++;
+  }
+  glEnd();
+  glLineWidth (view->samples*(lw > 0. ? lw : 1.));
+  glColor3f (lc[0], lc[1], lc[2]);
+  
+  // A border around the color scale
+  if (border) {
+    glBegin (GL_LINE_LOOP);
+    glVertex2f (0, 0);
+    if (horizontal) {
+      glVertex2f (0, width);
+      glVertex2f (height, width);
+      glVertex2f (height, 0);
+    } else {
+      glVertex2f (width, 0);
+      glVertex2f (width, height);
+      glVertex2f (0, height);
+    }
+    glEnd();
+  }
+
+  // Min and max values when specified
+  float fwidth = gl_StrokeWidth ('1');
+  if (!fsize)
+    fsize = 20;
+  float hscale = 2./(fsize*fwidth), vscale = hscale*view->width/view->height;
+  char str[99];
+  glColor3f (lc[0], lc[1], lc[2]);
+  if (horizontal) 
+    glTranslatef (0, -(fheight/(view->height)), 0);
+  else 
+    glTranslatef (width, -(fheight/(3*view->height)), 0);
+  glScalef (hscale, vscale, 1.);
+  sprintf (str, format, min);
+  if (min > -HUGE) {
+    glPushMatrix();
+    if (horizontal) 
+      glTranslatef (-fwidth*(strlen(str) - 1)/2, 0, 0);
+    glScalef (lscale, lscale, 1.);
+    gl_StrokeString (str);
+    glPopMatrix();
+  }
+  if (horizontal)
+    glTranslatef (height/hscale,0, 0);
+  else
+    glTranslatef (0, height/vscale, 0);
+  sprintf (str, format, max);
+  if (max < HUGE) {
+    glPushMatrix();
+    if (horizontal)
+      glTranslatef (-fwidth*(strlen(str) - 1)/2, 0, 0);
+    glScalef (lscale, lscale, 1.);
+    gl_StrokeString (str);
+    glPopMatrix();
+  }
+  // Add central value
+  if (mid) {
+    sprintf (str, format, (min + max)/2);
+    glPushMatrix();
+    if (horizontal)
+      glTranslatef (-height/(2*hscale) - fwidth*(strlen(str) - 1)/2,0, 0);
+    else
+      glTranslatef (0, -height/(2*vscale), 0);
+    glScalef (lscale, lscale, 1.);
+    gl_StrokeString (str);
+    glPopMatrix();
+  }
+  // Add label
+  if (horizontal)
+    glTranslatef (-height/(2*hscale) - lscale*fwidth*(strlen(label) - 1)/2, width/vscale, 0);
+  else
+    glTranslatef (-width/hscale, 0, 0);
+  
+  glScalef (lscale, lscale, 1.);
+  glTranslatef (0, fheight, 0);
+  gl_StrokeString (label);
+  
+  glMatrixMode (GL_MODELVIEW);
+  glPopMatrix();
+  glMatrixMode (GL_PROJECTION);
+  glPopMatrix();  
+  return true;
+}
+
+/**
+Parameters for an (optional) [colorbar](#colorbar). */
+
+#define COLORBAR_PARAMS					\
+    bool cbar = false,					\
+    float size = 15, float pos[2] = {-.95, -.95},	\
+    char * label = "", double lscale = 1,		\
+    bool horizontal = false, bool border = false,	\
+    bool mid = false, float fsize = 50,  		\
+    char * format = "%g", int levels = 50
 
 /**
 The somewhat complicated function below checks whether an interface
@@ -742,36 +857,70 @@ static void glvertex_normal3d (bview * view, Point point, vector n,
 }
 #endif // dimension <= 2
 
+/**
+# *draw_vof()*: displays VOF-reconstructed interfaces
+
+* *c*: the name (as a string) of the Volume-Of-Fluid field.
+* *s*: the (optional) name of the face fraction field.
+* *edges*: whether to display the edges or the facets.
+* *larger*: makes each cell larger by this factor. This helps close
+   the gaps in the VOF interface representation. Default is 1.1 in 3D
+   and when edges are not displayed, otherwise it is 1.
+* *filled*: in 2D, whether to fill the inside (1) or outside (-1).
+* *color*: use this field to color each interface fragment.
+* *min*, *max*: the minimum and maximum values to use for color mapping.
+* *spread*: the "spread factor" to use if *min* and *max* are not
+   defined. The maximum and minimum values will be taken as the average
+   plus or minus *spread* times the standard deviation. Default is 5. If
+   negative, the minimum and maximum values of the field are used.
+* *linear*: if *true* the color will be linearly interpolated for each
+   vertex of the facet.
+* *map*: the colormap to use. Default is *jet*.
+* *fc[]*: an array of red, green, blue values between 0 and 1 which
+  defines the facet color.
+* *lc[]*: an array of red, green, blue values between 0 and 1 which
+  defines the line color.
+* *lw*: the line width.
+*/
+
 trace
-bool draw_vof (struct _draw_vof p)
+bool draw_vof (char * c, char * s = NULL, bool edges = false,
+	       double larger = 0., int filled = 0,
+	       char * color = NULL,
+	       double min = 0, double max = 0, double spread = 0,
+	       bool linear = false,
+	       Colormap map = jet,
+	       float fc[3] = {0}, float lc[3] = {0}, float lw = 1.,
+	       bool expr = false,
+	       COLORBAR_PARAMS)
 {
-  scalar c = lookup_field (p.c);
-  if (c.i < 0) {
-    fprintf (stderr, "draw_vof(): no field named '%s'\n", p.c);
+  scalar d = lookup_field (c);
+  if (d.i < 0) {
+    fprintf (stderr, "draw_vof(): no field named '%s'\n", c);
     return false;
   }
-  face vector s = lookup_vector (p.s);
+  face vector fs = lookup_vector (s);
   
-  colorize_args (p);
+  colorize_args();
   
   double cmin = 1e-3; // do not reconstruct fragments smaller than this
 
 #if TREE
   // make sure we prolongate properly
-  void (* prolongation) (Point, scalar) = c.prolongation;
+  void (* prolongation) (Point, scalar) = d.prolongation;
   if (prolongation != fraction_refine) {
-    c.prolongation = fraction_refine;
-    c.dirty = true;
+    d.prolongation = fraction_refine;
+    d.dirty = true;
   }
 #endif // TREE
     
   bview * view = draw();
 #if dimension == 2
-  if (p.filled) {
-    glColor3f (p.fc[0], p.fc[1], p.fc[2]);
+  if (filled) {
+    glColor3f (fc[0], fc[1], fc[2]);
     glNormal3d (0, 0, view->reversed ? -1 : 1);
     foreach_visible (view) {
-      if ((p.filled > 0 && c[] >= 1.) || (p.filled < 0 && c[] <= 0.)) {
+      if ((filled > 0 && d[] >= 1.) || (filled < 0 && d[] <= 0.)) {
 	glBegin (GL_QUADS);
 	glvertex2d (view, x - Delta_x/2., y - Delta_y/2.);
 	glvertex2d (view, x + Delta_x/2., y - Delta_y/2.);
@@ -780,12 +929,12 @@ bool draw_vof (struct _draw_vof p)
 	glEnd();
 	view->ni++;
       }
-      else if (c[] > 0. && c[] < 1.) {
-	coord n = facet_normal (point, c, s), r = {1.,1.};
-	if (p.filled < 0)
+      else if (d[] > 0. && d[] < 1.) {
+	coord n = facet_normal (point, d, fs), r = {1.,1.};
+	if (filled < 0)
 	  foreach_dimension()
 	    n.x = - n.x;
-	double alpha = plane_alpha (p.filled < 0. ? 1. - c[] : c[], n);
+	double alpha = plane_alpha (filled < 0. ? 1. - d[] : d[], n);
 	alpha += (n.x + n.y)/2.;
 	foreach_dimension()
 	  if (n.x < 0.) alpha -= n.x, n.x = - n.x, r.x = - 1.;
@@ -826,13 +975,13 @@ bool draw_vof (struct _draw_vof p)
       }
     }
   }
-  else // !p.filled
-    draw_lines (view, p.lc, p.lw) {
+  else // !filled
+    draw_lines (view, lc, lw) {
       glBegin (GL_LINES);
       foreach_visible (view)
-	if (cfilter (point, c, cmin)) {
-	  coord n = facet_normal (point, c, s);
-	  double alpha = plane_alpha (c[], n);
+	if (cfilter (point, d, cmin)) {
+	  coord n = facet_normal (point, d, fs);
+	  double alpha = plane_alpha (d[], n);
 	  coord segment[2];
 	  if (facets (n, alpha, segment) == 2) {
 	    glvertex2d (view, x + segment[0].x*Delta, y + segment[0].y*Delta);
@@ -843,14 +992,14 @@ bool draw_vof (struct _draw_vof p)
       glEnd ();
     }
 #else // dimension == 3
-  double larger =
-    p.larger ? p.larger : p.edges || (p.color && !p.linear) ? 1. : 1.1;
-  if (p.edges)
-    draw_lines (view, p.lc, p.lw) {
+  if (!larger)
+    larger = edges || (color && !linear) ? 1. : 1.1;
+  if (edges)
+    draw_lines (view, lc, lw) {
       foreach_visible (view)
-	if (cfilter (point, c, cmin)) {
-	  coord n = facet_normal (point, c, s);
-	  double alpha = plane_alpha (c[], n);
+	if (cfilter (point, d, cmin)) {
+	  coord n = facet_normal (point, d, fs);
+	  double alpha = plane_alpha (d[], n);
 	  coord v[12];
 	  int m = facets (n, alpha, v, larger);
 	  if (m > 2) {
@@ -863,22 +1012,22 @@ bool draw_vof (struct _draw_vof p)
 	  }
 	}
     }
-  else // !p.edges
+  else // !edges
     colorize() {
       foreach_visible (view)
-	if (cfilter (point, c, cmin)) {
-	  coord n = facet_normal (point, c, s);
-	  double alpha = plane_alpha (c[], n);
+	if (cfilter (point, d, cmin)) {
+	  coord n = facet_normal (point, d, fs);
+	  double alpha = plane_alpha (d[], n);
 	  coord v[12];
 	  int m = facets (n, alpha, v, larger);
 	  if (m > 2) {
 	    glBegin (GL_POLYGON);
 	    for (int i = 0; i < m; i++) {
-	      if (p.linear) {
-		color_vertex (p, interp (point, v[i], col));
+	      if (linear) {
+		color_vertex (interp (point, v[i], col));
 	      }
 	      else {
-		color_facet (p);
+		color_facet();
 	      }
 	      glnormal3d (view, n.x, n.y, n.z);
 	      glvertex3d (view,
@@ -894,12 +1043,12 @@ bool draw_vof (struct _draw_vof p)
 #if TREE
   // revert prolongation
   if (prolongation != fraction_refine) {
-    c.prolongation = prolongation;
-    c.dirty = true;
+    d.prolongation = prolongation;
+    d.dirty = true;
   }
 #endif // TREE
 
-  if (p.expr) delete({col});
+  if (expr) delete({col});
   return true;
 }
 
@@ -912,48 +1061,46 @@ between *min* and *max* (included).
 Extra parameters are the same as for
 [draw_vof()](draw.h#draw_vof-displays-vof-reconstructed-interfaces). */
 
-struct _isoline {
-  char * phi;
-  double val;
-  int n;
-  
-  // all fields below must be identical to struct _draw_vof above
-  char * c;
-  char * s;
-  bool edges;
-  double larger;
-  int filled;
-
-  char * color;
-  double min, max, spread;
-  bool linear;
-  colormap map;
-  float fc[3], lc[3], lw;
-  bool expr;
-};
-
 trace
-bool isoline (struct _isoline p)
+bool isoline (char * phi,
+	      double val = 0.,
+	      int n = 1,
+	      bool edges = false,
+	      double larger = 0., int filled = 0,
+	      char * color = NULL,
+	      double min = 0, double max = 0, double spread = 0,
+	      bool linear = false,
+	      Colormap map = jet,
+	      float fc[3] = {0}, float lc[3] = {0}, float lw = 1.,
+	      bool expr = false,
+	      COLORBAR_PARAMS)
 {
 #if dimension == 2
-  if (!p.color) p.color = p.phi;
-  colorize_args (p);
-  scalar phi = col, fiso[];
-  face vector siso[];
-  p.c = "fiso", p.s = "siso";
-  struct _draw_vof a = *((struct _draw_vof *)&p.c);
-  if (p.n < 2) {
-    fractions (phi, fiso, siso, p.val);
-    draw_vof (a);
+  if (!color) color = phi;
+  colorize_args();
+  scalar fphi = col, fiso[];
+  if (!is_vertex_scalar (col)) {
+    fphi = new vertex scalar;
+    foreach_vertex()
+      fphi[] = (col[] + col[-1] + col[0,-1] + col[-1,-1])/4.;
   }
-  else if (p.max > p.min) {
-    double dv = (p.max - p.min)/(p.n - 1);
-    for (p.val = p.min; p.val <= p.max; p.val += dv) {
-      fractions (phi, fiso, siso, p.val);
-      draw_vof (a);
+  face vector siso[];
+  if (n < 2) {
+    fractions (fphi, fiso, siso, val);
+    draw_vof ("fiso", "siso", edges, larger, filled, color, min, max, spread,
+	      linear, map, fc, lc, lw, expr);
+  }
+  else if (max > min) {
+    double dv = (max - min)/(n - 1);
+    for (val = min; val <= max; val += dv) {
+      fractions (fphi, fiso, siso, val);
+      draw_vof ("fiso", "siso", edges, larger, filled, color, min, max, spread,
+		linear, map, fc, lc, lw, expr);      
     }
   }
-  if (p.expr) delete({col});
+  if (!is_vertex_scalar (col))
+    delete ({fphi});
+  if (expr) delete ({col});
 #else // dimension == 3
   assert (false);
 #endif // dimension == 3
@@ -971,17 +1118,12 @@ n_x x + n_y y + n_z z = \alpha
 $$
 */
 
-struct _cells {
-  coord n;
-  double alpha;
-  float lc[3], lw; // the line color and width
-};
-
 trace
-bool cells (struct _cells p)
+bool cells (coord n = {0,0,1}, double alpha = 0.,
+	    float lc[3] = {0}, float lw = 1.)
 {
   bview * view = draw();
-  draw_lines (view, p.lc, p.lw) {
+  draw_lines (view, lc, lw) {
 #if dimension == 2
     foreach_visible (view) {
       glBegin (GL_LINE_LOOP);
@@ -993,7 +1135,7 @@ bool cells (struct _cells p)
       view->ni++;
     }
 #else // dimension == 3
-    foreach_visible_plane (view, p.n, p.alpha) {
+    foreach_visible_plane (view, n, alpha) {
       coord v[12];
       int m = facets (n, alpha, v, 1.);
       if (m > 2) {
@@ -1014,33 +1156,31 @@ bool cells (struct _cells p)
 
 The vectors are scaled using the *scale* factor. */
 
-struct _vectors {
-  char * u;
-  double scale;    // default is one
-  float lc[3], lw; // the line color and width
-};
-
 trace
-bool vectors (struct _vectors p)
+bool vectors (char * u, double scale = 1, float lc[3] = {0}, float lw = 1.)
 {
 #if dimension == 2
-  vector u;
+  vector fu;
   struct { char x, y, z; } index = {'x', 'y', 'z'};
   foreach_dimension() {
     char name[80];
-    sprintf (name, "%s.%c", p.u, index.x);
-    u.x = lookup_field (name);
+    sprintf (name, "%s.%c", u, index.x);
+    fu.x = lookup_field (name);
+    if (fu.x.i < 0) {
+      fprintf (stderr, "vectors(): no field named '%s'\n", name);
+      return false;
+    }
   }
   bview * view = draw();
   float res = view->res;
   if (view->res < 15*view->samples)
     view->res = 15*view->samples;
-  draw_lines (view, p.lc, p.lw) {
-    double scale = (p.scale ? p.scale : 1.)*view->res/view->samples;
+  draw_lines (view, lc, lw) {
+    double fscale = (scale ? scale : 1.)*view->res/view->samples;
     glBegin (GL_LINES);
     foreach_visible (view)
-      if (u.x[] != nodata) {
-	coord f = { scale*u.x[], scale*u.y[] };
+      if (fu.x[] != nodata) {
+	coord f = { fscale*fu.x[], fscale*fu.y[] };
 	glvertex2d (view, x + f.x - (f.x - f.y/2.)/5.,
 		    y + f.y - (f.x/2. + f.y)/5.);
 	glvertex2d (view, x + f.x, y + f.y);
@@ -1078,42 +1218,41 @@ n_x x + n_y y + n_z z = \alpha
 $$
 */
 
-struct _squares {
-  char * color;
-  char * z;
-  double min, max, spread;
-  bool linear;
-  colormap map;
-  float fc[3], lc[3];
-  bool expr;
-  
-  coord n;
-  double alpha;
-};
-
 trace
-bool squares (struct _squares p)
+bool squares (char * color,
+	      char * z = NULL,
+	      double min = 0, double max = 0, double spread = 0,
+	      bool linear = false,
+	      Colormap map = jet,
+	      float fc[3] = {0}, float lc[3] = {0},
+	      bool expr = false,
+	      
+	      coord n = {0,0,1},
+	      double alpha = 0,
+	      float lw = 1,
+	      COLORBAR_PARAMS)
 {
 #if dimension == 2
   scalar Z = {-1};
-  vector n;
+  vector fn;
   bool zexpr = false;
-  if (p.z) {
-    Z = compile_expression (p.z, &zexpr);
+  if (z) {
+    Z = compile_expression (z, &zexpr);
     if (Z.i < 0)
       return false;
-    n = new vector;
+    fn = new vector;
     foreach()
       foreach_dimension()
-        n.x[] = (Z[1] - Z[-1])/(2.*Delta_x);
+        fn.x[] = (Z[1] - Z[-1])/(2.*Delta_x);
+    boundary ({fn});
   }
 #endif
-  colorize_args (p);
+  colorize_args();
   scalar f = col;
   
   bview * view = draw();
   glShadeModel (GL_SMOOTH);
-  if (p.linear) {
+  if (linear) {
     colorize() {
 #if dimension == 2
       if (Z.i < 0) {
@@ -1121,21 +1260,19 @@ bool squares (struct _squares p)
 	foreach_visible (view)
 	  if (f[] != nodata) {
 	    glBegin (GL_TRIANGLE_FAN);
-	    color_vertex (p,
-			  (4.*f[] +
+	    color_vertex ((4.*f[] +
 			   2.*(f[1] + f[-1] + f[0,1] + f[0,-1]) +
-			   f[-1,-1] + f[1,1] + f[-1,1] + f[1,-1])/16.
-			  );
+			   f[-1,-1] + f[1,1] + f[-1,1] + f[1,-1])/16.);
 	    glvertex2d (view, x, y);
-	    color_vertex (p, (f[] + f[-1] + f[-1,-1] + f[0,-1])/4.);
+	    color_vertex ((f[] + f[-1] + f[-1,-1] + f[0,-1])/4.);
 	    glvertex2d (view, x - Delta_x/2., y - Delta_y/2.);
-	    color_vertex (p, (f[] + f[1] + f[1,-1] + f[0,-1])/4.);
+	    color_vertex ((f[] + f[1] + f[1,-1] + f[0,-1])/4.);
 	    glvertex2d (view, x + Delta_x/2., y - Delta_y/2.);
-	    color_vertex (p, (f[] + f[1] + f[1,1] + f[0,1])/4.);
+	    color_vertex ((f[] + f[1] + f[1,1] + f[0,1])/4.);
 	    glvertex2d (view, x + Delta_x/2., y + Delta_y/2.);
-	    color_vertex (p, (f[] + f[-1] + f[-1,1] + f[0,1])/4.);
+	    color_vertex ((f[] + f[-1] + f[-1,1] + f[0,1])/4.);
 	    glvertex2d (view, x - Delta_x/2., y + Delta_y/2.);
-	    color_vertex (p, (f[] + f[-1] + f[-1,-1] + f[0,-1])/4.);
+	    color_vertex ((f[] + f[-1] + f[-1,-1] + f[0,-1])/4.);
 	    glvertex2d (view, x - Delta_x/2., y - Delta_y/2.);
 	    glEnd();
 	    view->ni++;
@@ -1145,30 +1282,30 @@ bool squares (struct _squares p)
 	foreach_leaf() // fixme: foreach_visible() would be better
 	  if (f[] != nodata) {
 	    glBegin (GL_TRIANGLE_FAN);
-	    color_vertex (p, (4.*f[] +
-			      2.*(f[1] + f[-1] + f[0,1] + f[0,-1]) +
-			      f[-1,-1] + f[1,1] + f[-1,1] + f[1,-1])/16.);
-	    glvertex_normal3d (view, point, n, x, y, Z[]);
-	    color_vertex (p, (f[] + f[-1] + f[-1,-1] + f[0,-1])/4.);
-	    glvertex_normal3d (view, point, n, x - Delta_x/2., y - Delta_y/2.,
+	    color_vertex ((4.*f[] +
+			   2.*(f[1] + f[-1] + f[0,1] + f[0,-1]) +
+			   f[-1,-1] + f[1,1] + f[-1,1] + f[1,-1])/16.);
+	    glvertex_normal3d (view, point, fn, x, y, Z[]);
+	    color_vertex ((f[] + f[-1] + f[-1,-1] + f[0,-1])/4.);
+	    glvertex_normal3d (view, point, fn, x - Delta_x/2., y - Delta_y/2.,
 			       (Z[] + Z[-1] + Z[-1,-1] + Z[0,-1])/4.);
-	    color_vertex (p, (f[] + f[1] + f[1,-1] + f[0,-1])/4.);
-	    glvertex_normal3d (view, point, n, x + Delta_x/2., y - Delta_y/2.,
+	    color_vertex ((f[] + f[1] + f[1,-1] + f[0,-1])/4.);
+	    glvertex_normal3d (view, point, fn, x + Delta_x/2., y - Delta_y/2.,
 			       (Z[] + Z[1] + Z[1,-1] + Z[0,-1])/4.);
-	    color_vertex (p, (f[] + f[1] + f[1,1] + f[0,1])/4.);
-	    glvertex_normal3d (view, point, n, x + Delta_x/2., y + Delta_y/2.,
+	    color_vertex ((f[] + f[1] + f[1,1] + f[0,1])/4.);
+	    glvertex_normal3d (view, point, fn, x + Delta_x/2., y + Delta_y/2.,
 			       (Z[] + Z[1] + Z[1,1] + Z[0,1])/4.);
-	    color_vertex (p, (f[] + f[-1] + f[-1,1] + f[0,1])/4.);
-	    glvertex_normal3d (view, point, n, x - Delta_x/2., y + Delta_y/2.,
+	    color_vertex ((f[] + f[-1] + f[-1,1] + f[0,1])/4.);
+	    glvertex_normal3d (view, point, fn, x - Delta_x/2., y + Delta_y/2.,
 			       (Z[] + Z[-1] + Z[-1,1] + Z[0,1])/4.);
-	    color_vertex (p, (f[] + f[-1] + f[-1,-1] + f[0,-1])/4.);
-	    glvertex_normal3d (view, point, n, x - Delta_x/2., y - Delta_y/2.,
+	    color_vertex ((f[] + f[-1] + f[-1,-1] + f[0,-1])/4.);
+	    glvertex_normal3d (view, point, fn, x - Delta_x/2., y - Delta_y/2.,
 			       (Z[] + Z[-1] + Z[-1,-1] + Z[0,-1])/4.);
 	    glEnd();
 	    view->ni++;	    
 	  }
 #else // dimension == 3
-      foreach_visible_plane (view, p.n, p.alpha)
+      foreach_visible_plane (view, n, alpha)
 	if (f[] != nodata) {
 	  coord v[12];
 	  int m = facets (n, alpha, v, 1.);
@@ -1178,14 +1315,14 @@ bool squares (struct _squares p)
 	      foreach_dimension()
 		c.x += v[i].x/m;
 	    glBegin (GL_TRIANGLE_FAN);
-	    color_vertex (p, interp (point, c, f));
+	    color_vertex (interp (point, c, f));
 	    glvertex3d (view, x + c.x*Delta, y + c.y*Delta, z + c.z*Delta);
 	    for (int i = 0; i < m; i++) {
-	      color_vertex (p, interp (point, v[i], f));
+	      color_vertex (interp (point, v[i], f));
 	      glvertex3d (view,
 			  x + v[i].x*Delta, y + v[i].y*Delta, z + v[i].z*Delta);
 	    }
-	    color_vertex (p, interp (point, v[0], f));
+	    color_vertex (interp (point, v[0], f));
 	    glvertex3d (view,
 			x + v[0].x*Delta, y + v[0].y*Delta, z + v[0].z*Delta);
 	    glEnd ();
@@ -1195,32 +1332,32 @@ bool squares (struct _squares p)
 #endif // dimension == 3
     }
   }
-  else { // !p.linear
+  else { // !linear
 #if dimension == 2
     glNormal3d (0, 0, view->reversed ? -1 : 1);
     glBegin (GL_QUADS);
     foreach_visible (view)
       if (f[] != nodata) {
-	color_facet (p);
+	color_facet();
 	glvertex2d (view, x - Delta_x/2., y - Delta_y/2.);
-	color_facet (p);
+	color_facet();
 	glvertex2d (view, x + Delta_x/2., y - Delta_y/2.);
-	color_facet (p);
+	color_facet();
 	glvertex2d (view, x + Delta_x/2., y + Delta_y/2.);
-	color_facet (p);
+	color_facet();
 	glvertex2d (view, x - Delta_x/2., y + Delta_y/2.);
 	view->ni++;
       }
     glEnd();
 #else // dimension == 3
-    foreach_visible_plane (view, p.n, p.alpha)
+    foreach_visible_plane (view, n, alpha)
       if (f[] != nodata) {
 	coord v[12];
 	int m = facets (n, alpha, v, 1.);
 	if (m > 2) {
 	  glBegin (GL_POLYGON);
 	  for (int i = 0; i < m; i++) {
-	    color_facet (p);
+	    color_facet();
 	    glvertex3d (view,
 			x + v[i].x*Delta, y + v[i].y*Delta, z + v[i].z*Delta);
 	  }
@@ -1230,10 +1367,10 @@ bool squares (struct _squares p)
       }
 #endif // dimension == 3
   }
-  if (p.expr) delete ({col});
+  if (expr) delete ({col});
 #if dimension == 2
   if (zexpr) delete ({Z});
-  if (p.z) delete ((scalar *){n});
+  if (z) delete ((scalar *){fn});
 #endif
   return true;
 }
@@ -1247,16 +1384,11 @@ bool squares (struct _squares p)
 * *lw*: the line width.
 */
 
-struct _box {
-  bool notics;
-  float lc[3], lw;
-};
-	  
 trace
-bool box (struct _box p)
+bool box (bool notics = false, float lc[3] = {0}, float lw = 1.)
 {
   bview * view = draw();
-  draw_lines (view, p.lc, p.lw) {
+  draw_lines (view, lc, lw) {
 
     float height = 0.5*gl_StrokeHeight();
     float width = gl_StrokeWidth ('1'), scale = L0/(60.*width), length;
@@ -1265,7 +1397,7 @@ bool box (struct _box p)
   
     glMatrixMode (GL_MODELVIEW);
 
-    if (!p.notics) {
+    if (!notics) {
       int nt = 8;
       for (int i = 0; i <= nt; i++) {
 	glPushMatrix();
@@ -1374,44 +1506,41 @@ bool box (struct _box p)
 The *min*, *max*, *spread*, *map* etc.  arguments work as described in
 [draw_vof()](draw.h#draw_vof-displays-vof-reconstructed-interfaces). */
 
-struct _isosurface {
-  char * f;
-  double v;
-  
-  char * color;
-  double min, max, spread;
-  bool linear;
-  colormap map;
-  float fc[3], lc[3], lw;
-  bool expr;
-};
-
 trace
-bool isosurface (struct _isosurface p)
+bool isosurface (char * f,
+		 double v,
+		 
+		 char * color = NULL,
+		 double min = 0, double max = 0, double spread = 0,
+		 bool linear = false,
+		 Colormap map = jet,
+		 float fc[3] = {0}, float lc[3] = {0}, float lw = 1,
+		 bool expr = false,
+		 COLORBAR_PARAMS)
 {
 #if dimension > 2
-  if (!p.f)
+  if (!f)
     return false;
   
-  scalar f = {-1};
+  scalar ff = {-1};
   bool fexpr;
-  if (strcmp (p.f, "level")) {
-    f = compile_expression (p.f, &fexpr);
-    if (f.i < 0)
+  if (strcmp (f, "level")) {
+    ff = compile_expression (f, &fexpr);
+    if (ff.i < 0)
       return false;
   }
 
-  colorize_args (p);
+  colorize_args();
 
-  vertex scalar v[];
+  vertex scalar fv[];
   foreach_vertex()
-    v[] = (f[] + f[-1] + f[0,-1] + f[-1,-1] +
-	   f[0,0,-1] + f[-1,0,-1] + f[0,-1,-1] + f[-1,-1,-1])/8.;
+    fv[] = (ff[] + ff[-1] + ff[0,-1] + ff[-1,-1] +
+	    ff[0,0,-1] + ff[-1,0,-1] + ff[0,-1,-1] + ff[-1,-1,-1])/8.;
   
   vector n[];
   foreach()
     foreach_dimension()
-      n.x[] = center_gradient(f);
+      n.x[] = center_gradient(ff);
   boundary ({n}); // fixme: not detected by interp() below
 
   bview * view = draw();
@@ -1419,24 +1548,24 @@ bool isosurface (struct _isosurface p)
   colorize() {
     foreach_visible (view) {
       double val[8] = {
-	v[0,0,0], v[1,0,0], v[1,0,1], v[0,0,1],
-	v[0,1,0], v[1,1,0], v[1,1,1], v[0,1,1]
+	fv[0,0,0], fv[1,0,0], fv[1,0,1], fv[0,0,1],
+	fv[0,1,0], fv[1,1,0], fv[1,1,1], fv[0,1,1]
       };
       double t[5][3][3];
-      int nt = polygonize (val, p.v, t);
+      int nt = polygonize (val, v, t);
       for (int i = 0; i < nt; i++) {
-	color_facet (p);
+	color_facet();
 	glBegin (GL_POLYGON);
 	for (int j = 0; j < 3; j++) {
 	  coord v = {t[i][j][0], t[i][j][1], t[i][j][2]}, np;
 	  foreach_dimension()
 	    np.x = interp (point, v, n.x);
 	  glnormal3d (view, np.x, np.y, np.z);
-	  if (p.linear) {
-	    color_vertex (p, interp (point, v, col));
+	  if (linear) {
+	    color_vertex (interp (point, v, col));
 	  }
 	  else {
-	    color_facet (p);
+	    color_facet();
 	  }
 	  glvertex3d (view, x + v.x*Delta_x, y + v.y*Delta_y, z + v.z*Delta_z);
 	}
@@ -1445,8 +1574,8 @@ bool isosurface (struct _isosurface p)
       }
     }
   }
-  if (p.expr) delete ({col});
-  if (fexpr) delete ({f});
+  if (expr) delete ({col});
+  if (fexpr) delete ({ff});
 #endif // dimension > 2
   return true;
 }
@@ -1459,35 +1588,31 @@ bool isosurface (struct _isosurface p)
 * *tx*, *ty*, *quat*, *fov*: definition of the target viewpoint.
 */
 
-struct _travelling {
-  double start, end;
-  float tx, ty, quat[4], fov;
-};
+#define interpo(pv, v)							\
+  (!pv ? v : ((t - start)*(pv) + (end - t)*(v))/(end - start))
 
-#define interpo(v)							\
-  (!p.v ? v : ((t - p.start)*(p.v) + (p.end - t)*(v))/(p.end - p.start))
-
-void travelling (struct _travelling p)
+void travelling (double start = 0, double end = 0,
+		 float tx = 0, float ty = 0, float quat[4] = {0}, float fov = 0)
 {
-  static float tx, ty, quat[4], fov;
+  static float stx, sty, squat[4], sfov;
   static double told = -1.;
-  if (told < p.start && t >= p.start) {
+  if (told < start && t >= start) {
     bview * view = get_view();
-    tx = view->tx, ty = view->ty, fov = view->fov;
+    stx = view->tx, sty = view->ty, sfov = view->fov;
     for (int i = 0; i < 4; i++)
-      quat[i] = view->quat[i];
+      squat[i] = view->quat[i];
   }
-  if (t >= p.start && t <= p.end)
-    view (tx = interpo (tx), ty = interpo (ty),
-	  fov = interpo (fov),
-	  quat = {interpo(quat[0]), interpo(quat[1]),
-	          interpo(quat[2]), interpo(quat[3])});
-  if (told < p.end && t >= p.end) {
+  if (t >= start && t <= end)
+    view (tx = interpo (tx, stx), ty = interpo (ty, sty),
+	  fov = interpo (fov, sfov),
+	  quat = {interpo(quat[0], squat[0]), interpo(quat[1], squat[1]),
+	          interpo(quat[2], squat[2]), interpo(quat[3], squat[3])});
+  if (told < end && t >= end) {
     bview * view = get_view();
-    tx = view->tx, ty = view->ty, fov = view->fov;
+    stx = view->tx, sty = view->ty, sfov = view->fov;
     for (int i = 0; i < 4; i++)
-      quat[i] = view->quat[i];
-  }  
+      squat[i] = view->quat[i];
+  }
   told = t;  
 }
 
@@ -1506,15 +1631,12 @@ void travelling (struct _travelling p)
 * *lw*: the line width.
 */
 
-struct _draw_string {
-  char * str;
-  int pos;
-  float size;
-  float lc[3], lw;
-};
-
 trace
-bool draw_string (struct _draw_string p)
+bool draw_string (char * str,
+		  int pos = 0,
+		  float size = 40,
+		  float lc[3] = {0}, float lw = 1)
+
 {
   bview * view = draw();
   
@@ -1526,24 +1648,24 @@ bool draw_string (struct _draw_string p)
   glPushMatrix();
   glLoadIdentity();
     
-  glColor3f (p.lc[0], p.lc[1], p.lc[2]);
-  glLineWidth (view->samples*(p.lw > 0. ? p.lw : 1.));
+  glColor3f (lc[0], lc[1], lc[2]);
+  glLineWidth (view->samples*(lw > 0. ? lw : 1.));
 
   float width  = gl_StrokeWidth ('1'), height = gl_StrokeHeight();
-  if (!p.size)
-    p.size = 40;
-  float hscale = 2./(p.size*width), vscale = hscale*view->width/view->height;
+  if (!size)
+    size = 40;
+  float hscale = 2./(size*width), vscale = hscale*view->width/view->height;
   float vmargin = width/2.*vscale;
-  if (p.pos == 0)
+  if (pos == 0)
     glTranslatef (-1., -1. + vmargin, 0.);
-  else if (p.pos == 1)
+  else if (pos == 1)
     glTranslatef (-1., 1. - height*vscale, 0.);
-  else if (p.pos == 2)
-    glTranslatef (1. - strlen(p.str)*width*hscale, 1. - height*vscale, 0.);
+  else if (pos == 2)
+    glTranslatef (1. - strlen(str)*width*hscale, 1. - height*vscale, 0.);
   else
-    glTranslatef (1. - strlen(p.str)*width*hscale, -1. + vmargin, 0.);    
+    glTranslatef (1. - strlen(str)*width*hscale, -1. + vmargin, 0.);    
   glScalef (hscale, vscale, 1.);
-  gl_StrokeString (p.str); 
+  gl_StrokeString (str); 
   
   glMatrixMode (GL_MODELVIEW);
   glPopMatrix();
@@ -1556,31 +1678,27 @@ bool draw_string (struct _draw_string p)
 /**
 # *labels()*: displays label fields */
 
-struct _labels {
-  char * f;
-  float lc[3], lw; // the line color and width
-};
-
 trace
-bool labels (struct _labels p)
+bool labels (char * f,
+	     float lc[3] = {0}, float lw = 1)
 {
 #if dimension == 2
   bool expr = false;
-  scalar f = compile_expression (p.f, &expr);
-  if (f.i < 0)
+  scalar ff = compile_expression (f, &expr);
+  if (ff.i < 0)
     return false;
   bview * view = draw();
   float width  = gl_StrokeWidth ('1'), height = gl_StrokeHeight();
   float res = view->res;
   if (view->res < 150*view->samples)
     view->res = 150*view->samples;
-  draw_lines (view, p.lc, p.lw) {
+  draw_lines (view, lc, lw) {
     glMatrixMode (GL_MODELVIEW);
     foreach_visible (view)
-      if (f[] != nodata) {
+      if (ff[] != nodata) {
 	glPushMatrix();
 	char s[80];
-	sprintf (s, "%g", f[]);
+	sprintf (s, "%g", ff[]);
 	float scale = 0.8*Delta_x/(strlen(s)*width);
 	glTranslatef (x - 0.4*Delta_x, y - scale*height/3., 0.);
 	glScalef (scale, scale, 1.);
@@ -1589,7 +1707,7 @@ bool labels (struct _labels p)
       }
   }
   view->res = res;
-  if (expr) delete ({f});
+  if (expr) delete ({ff});
   return true;
 #else // dimension == 3
   fprintf (stderr, "labels() is not implemented in 3D yet\n");
@@ -1606,7 +1724,7 @@ user interface. */
 #include "draw_json.h"
 
 struct {
-  int (* json) (void * q, char * s, int len);
+  int (* json) (char * s, int len);
 } bview_interface[] = {
   { _draw_vof_json },
   { _squares_json },

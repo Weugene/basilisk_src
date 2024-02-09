@@ -8,6 +8,7 @@ scalar * tracers = {f};
 int main()
 {
   // coordinates of lower-left corner
+  size (1.[0]); // dimensionless
   origin (-0.5, -0.5);
   // maximum timestep
   DT = .1;

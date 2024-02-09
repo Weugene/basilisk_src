@@ -14,15 +14,16 @@ int main()
   rho1 = 1./1000.;
   rho2 = 1.;
   G.y = -9.81;
+  DT = 1e-3 [0,1];
   Y0 = - L0/2.;
-  DT = 1e-3;
   N = 256;
   run();
 }
 
 event init (i = 0)
 {
-  fraction (f, - (0.07*cos(2.*pi*x) - y));
+  double a = 0.07, k = 2.*pi;
+  fraction (f, - (a*cos(k*x) - y));
 }
 
 event profiles (t = 0.1; t += 0.1; t <= 0.5)

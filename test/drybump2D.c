@@ -10,7 +10,7 @@ int main()
 {
   origin (-0.5, -0.5);
   init_grid (1 << LEVEL);
-  DT = 1e-1;
+  DT = 1e-1 [0,1];
   run();
 }
 
@@ -26,10 +26,13 @@ u.n[top]    = neumann(0);
 u.n[bottom] = neumann(0);
 #endif
 
+double a2 = 200.;
+
 double terrain (double x, double y)
 {
   x -= -0.25; y -= -0.25;
-  return 0.5*exp(-200.*(x*x + y*y));
+  double b = 0.5;
+  return b*exp(-a2*(x*x + y*y));
 }
 
 void refine_zb (Point point, scalar zb)
@@ -41,8 +44,9 @@ void refine_zb (Point point, scalar zb)
 event init (i = 0)
 {
   zb.refine = refine_zb; // updates terrain
+  double b = 1.;
   foreach() {
-    h[] = exp(-200.*(x*x + y*y));
+    h[] = b*exp(-a2*(x*x + y*y));
     zb[] = terrain (x, y);
     h[] = max(h[] - zb[], 0.);
   }

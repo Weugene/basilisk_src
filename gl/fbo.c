@@ -266,8 +266,7 @@ bool report_glerror(const char * function)
 {
   GLenum tGLErr = glGetError();
   if (tGLErr != GL_NO_ERROR) {
-    fprintf (stderr, "OpenGL error %04x: %s after %s\n",
-	     tGLErr, gluErrorString(tGLErr), function);
+    fprintf (stderr, "OpenGL error %04x after %s\n", tGLErr, function);
     return true;
   }
   return false;

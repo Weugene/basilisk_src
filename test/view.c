@@ -31,11 +31,13 @@ int main() {
   </table>
   */
   
-  view (width = 400, height = 400, cache = 10);
+  view (width = 550, height = 400, tx = -0.2, cache = 10);
   box();
   draw_vof ("f");
   cells();
-  squares ("x < 0 && y < 0 ? sin(6*pi*x)*cos(8*pi*y) : nodata", spread = -1);
+  squares ("x < 0 && y < 0 ? sin(6*pi*x)*cos(8*pi*y) : nodata", spread = -1,
+	   cbar = true, border = true, pos = {0.47, - 0.7},
+	   label = "A colorbar!", mid = true, format = "%9.5f", levels = 10);
   squares ("(f[0,1] - f[0,-1])/(2.*Delta)", spread = -1);
 #if dimension == 2  
   isoline ("sqrt(x^2 + y^2)", n = 10, spread = -1, lc = {1,0,0});

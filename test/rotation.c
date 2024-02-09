@@ -69,9 +69,10 @@ smooth function. */
 
 double bump (double x, double y)
 {
+  double k = 20., a = 20000.;
   double r2 = x*x + y*y; 
-  double coeff = 20. + 20000.*r2*r2*r2*r2;
-  return (1. + cos(20.*x)*cos(20.*y))*exp(-coeff*r2)/2.;
+  double coeff = 20. + a*r2*r2*r2*r2;
+  return (1. + cos(k*x)*cos(k*y))*exp(-coeff*r2)/2.;
 }
 
 event init (i = 0)

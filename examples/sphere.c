@@ -34,31 +34,35 @@ face vector muv[];
 The domain size is $16^3$. We move the origin so that the center of
 the unit sphere is not too close to boundaries. */
 
+double D = 1. [1];
+
 int main()
 {
   init_grid (64);
-  size (16.);
-  origin (-3, -L0/2., -L0/2.);
+  size (16.*D);
+  origin (- 3.*D, -L0/2., -L0/2.);
   mu = muv;
   run();
 }
 
 
 /**
-The viscosity is just $1/Re$, because we chose a sphere of diameter
-unity and an unit inflow velocity. */
+The viscosity is given by the Reynolds number, the sphere diameter and
+the inflow velocity */
+
+double U0 = 1., Re = 300.;
 
 event properties (i++)
 {
   foreach_face()
-    muv.x[] = fm.x[]/300.;
+    muv.x[] = fm.x[]*D*U0/Re;
 }
 
 /**
 The boundary conditions are inflow with unit velocity on the
 left-hand-side and outflow on the right-hand-side. */
 
-u.n[left]  = dirichlet(1.);
+u.n[left]  = dirichlet(U0);
 p[left]    = neumann(0.);
 pf[left]   = neumann(0.);
 
@@ -79,19 +83,19 @@ event init (t = 0) {
   We initially refine only in a sphere, slightly larger than the solid
   sphere. */
 
-  refine (x*x + y*y + z*z < sq(0.6) && level < maxlevel);
+  refine (x*x + y*y + z*z < sq(1.2*D/2.) && level < maxlevel);
 
   /**
   We define the unit sphere. */
 
-  solid (cs, fs, x*x + y*y + z*z - sq(0.5));
+  solid (cs, fs, x*x + y*y + z*z - sq(D/2.));
 
   /**
-  We set the initially horizontal velocity to unity everywhere
-  (outside the sphere). */
+  We set the initially horizontal velocity to the inflow velocity
+  everywhere (outside the sphere). */
   
   foreach()
-    u.x[] = cs[] ? 1. : 0.;
+    u.x[] = cs[] ? U0 : 0.;
 }
 
 /**
@@ -131,7 +135,7 @@ We set an adaptation criterion with an error threshold of 0.02 on all
 velocity components and $10^{-2}$ on the geometry. */
 
 event adapt (i++) {
-  astats s = adapt_wavelet ({cs,u}, (double[]){1e-2,0.02,0.02,0.02},
+  astats s = adapt_wavelet ({cs,u}, (double[]){1e-2,0.02,0.02,0.02}, // fixme: these are not seen....
 			    maxlevel, 4);
   fprintf (stderr, "# refined %d cells, coarsened %d cells\n", s.nf, s.nc);
 }

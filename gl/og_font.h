@@ -2,6 +2,8 @@
  * The stroke font structures
  */
 
+#include "tinygl.h"
+
 typedef struct tagSOG_StrokeVertex SOG_StrokeVertex;
 struct tagSOG_StrokeVertex
 {

@@ -78,13 +78,13 @@ double area_integral (Zarea * a, double z1, double z2, double * Az)
 	   (cube(z2) - cube(z))/3.*(f2 - f1))/(z2 - z);
   }
   else
-    v2 = zv2 = 0.;
+    v2 = 0., zv2 = 0.;
   
   int i1;
   double v1, zv1;
   if (z1 <= a->min)
-    v1 = zv1 = 0., i1 = -1;
-  else {  
+    v1 = 0., zv1 = 0., i1 = -1;
+  else {
     i1 = (z1 - a->min)/(a->max - a->min)*(a->n - 1);
     double f1, f2, z;
     if (i1 >= a->n - 1) {
@@ -104,7 +104,7 @@ double area_integral (Zarea * a, double z1, double z2, double * Az)
 	     (cube(z) - cube(z1))/3.*(f2 - f1))/(z - z1);
     }
     else
-      v1 = zv1 = 0.;
+      v1 = 0., zv1 = 0.;
   }
     
   double V = v1 + v2;
@@ -124,7 +124,7 @@ double area_z2 (Zarea * a, double z1, double dv, double * Az)
   double zm = z1, z2 = z1 + 10.*(a->max - a->min);
   double vol = area_integral (a, z1, z2, Az);
   assert (vol > dv);
-  while (fabs (z2 - zm) > 1e-12) {
+  while (fabs (z2 - zm) > dry) {
     double z = (zm + z2)/2.;
     vol = area_integral (a, z1, z, Az);
     if (vol > dv) z2 = z;
@@ -135,21 +135,20 @@ double area_z2 (Zarea * a, double z1, double dv, double * Az)
   return (zm + z2)/2.;
 }
 
-
-Zarea zarea (struct _Zarea p)
+Zarea zarea (scalar zb, double * A, double * V, int n,
+	     double max = 0., double min = 0.)
 {
-  if (p.min == 0.)
-    p.min = statsf (p.zb).min;
-  for (int i = 0; i < p.n; i++) {
-    double val = p.min + i*(p.max - p.min)/(p.n - 1);
+  if (min == 0.)
+    min = statsf (zb).min;
+  for (int i = 0; i < n; i++) {
+    double val = min + i*(max - min)/(n - 1);
 #if dimension == 2    
     scalar f[];
-    fractions (p.zb, f, val = val);
+    fractions (zb, f, val = val);
     stats sf = statsf(f);
-    p.A[i] = sf.volume - sf.sum;
+    A[i] = sf.volume - sf.sum;
 #else
     double area = 0.;
-    scalar zb = p.zb;
     foreach(reduction(+:area)) {
       double a = (zb[] + zb[-1])/2. - val, b = (zb[] + zb[1])/2. - val;
       if (a*b < 0.) {
@@ -159,20 +158,21 @@ Zarea zarea (struct _Zarea p)
       else if (a < 0.)
 	area += dv();
     }
-    p.A[i] = area;
+    A[i] = area;
 #endif
   }
-  return p;
+  return (Zarea){ zb, A, V, n, max, min };
 }
 
-Zarea zvolume (struct _Zarea p)
+Zarea zvolume (scalar zb, double * A, double * V, int n,
+	       double max = 0., double min = 0.)
 {
-  Zarea s = zarea (p);
+  Zarea s = zarea (zb, A, V, n, max, min);
   double volume = 0.;
-  for (int i = 0; i < p.n; i++) {
-    double dz = (s.max - s.min)/(s.n - 1);
-    volume += dz*p.A[i];
-    p.V[i] = volume;
+  for (int i = 0; i < n; i++) {
+    double dz = (s.max - s.min)/(n - 1);
+    volume += dz*A[i];
+    V[i] = volume;
   }
   return s;
 }
@@ -229,31 +229,27 @@ int heavier_than (const void * a, const void * b)
   return p1->rho > p2->rho ? -1 : 1;
 }
 
-struct _Energy {
-  double * PE, * KE;
-};
-
-double energy (struct _Energy p)
+double energy (double * PE = NULL, double * KE = NULL)
 {
-  double PE = 0., KE = 0.;
-  foreach(reduction(+:PE) reduction(+:KE)) {
+  double vPE = 0., vKE = 0.;
+  foreach(reduction(+:vPE) reduction(+:vKE)) {
     double z = zb[];
     foreach_layer() {
       z += h[]/2;
       double mass = h[]*dv()*(1. + drho(T[]));
-      PE += mass*z;
+      vPE += mass*z;
 #if NH
-      KE += mass*sq(w[])/2.;
+      vKE += mass*sq(w[])/2.;
 #endif
       foreach_dimension()
-	KE += mass*sq(u.x[])/2.;
+	vKE += mass*sq(u.x[])/2.;
       z += h[]/2;
     }
   }
-  PE *= G;
-  if (p.PE) *p.PE = PE;
-  if (p.KE) *p.KE = KE;
-  return PE + KE;
+  vPE *= G;
+  if (PE) *PE = vPE;
+  if (KE) *KE = vKE;
+  return vPE + vKE;
 }
 
 // Parallel sort
@@ -299,17 +295,11 @@ size_t psort (void ** base, size_t nmemb, size_t size,
 
 // Resting Potential Energy: see e.g. Ilicak et al, 2012, Appendix A
 
-struct Rpe {
-  int n;       // optional: default 100
-};
-
 trace
-double RPE (struct Rpe q)
+double RPE (int n = 100)
 {
-  if (!q.n) q.n = 100;
-
-  double A[q.n], V[q.n];
-  Zarea vol = zarea (zb, A, V, q.n);
+  double A[n], V[n];
+  Zarea vol = zarea (zb, A, V, n);
 #if 0
   for (int i = 0; i < vol.n; i++) {
     double dz = (vol.max - vol.min)/(vol.n - 1);

@@ -25,11 +25,11 @@ set to 0.1 and half-width to 12.2 as done in section 3.2.1 of [Madsen
 et al, 2008](/src/references.bib#madsen2008). */
 
 #define MAXLEVEL 15
-double a = 0.1, b = 12.2;
+double h0 = 1, a = 0.1, b = 12.2;
 
 int main() {
   N = 1 << MAXLEVEL;
-  L0 = 4000.;
+  L0 = 4000. [1];
   G = 1.;
 #if !SAINT_VENANT
   gradient = NULL;
@@ -43,8 +43,8 @@ symmetry at $x=0$. */
 
 event init (i = 0) {
   foreach() {
-    h[] = 1. + a*(x < b);
-    zb[] = -1.;
+    h[] = h0 + a*(x < b);
+    zb[] = - h0;
   }
 }
 
@@ -60,7 +60,7 @@ event plot (t = {35, 90, 700, 2000}) {
   sprintf (name, "t-%g", t);
   FILE * fp = fopen (name, "w");
   foreach (serial)
-    fprintf (fp, "%g %g\n", x - b - t, eta[]);
+    fprintf (fp, "%g %g\n", x - b - t*sqrt(G*h0), eta[]);
   fclose (fp);
 }
 

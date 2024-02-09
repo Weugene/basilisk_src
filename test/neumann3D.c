@@ -33,6 +33,7 @@ double exact_gradient (Point point, double xc, double yc, double zc)
 int main()
 {
   for (N = 32; N <= 256; N *= 2) {
+    size (1. [0]); // dimensionless space
     origin (-L0/2., -L0/2., -L0/2.);
     init_grid (N);
 
@@ -150,8 +151,7 @@ int main()
 
     timer t = timer_start();
     mgstats s = poisson (a, b, alpha = fs,
-			 embed_flux =
-			 a.boundary[embed] != symmetry ? embed_flux : NULL,
+			 flux = a.boundary[embed] != symmetry ? embed_flux : NULL,
 			 tolerance = 1e-6);
     double dt = timer_elapsed (t);
     printf ("%d %g %d %d\n", N, dt, s.i, s.nrelax);

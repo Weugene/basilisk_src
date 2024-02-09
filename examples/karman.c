@@ -27,8 +27,9 @@ face vector muv[];
 /**
 The domain is eight units long, centered vertically. */
 
-int main() {
-  L0 = 8.;
+int main()
+{
+  L0 = 8. [1];
   origin (-0.5, -L0/2.);
   N = 512;
   mu = muv;
@@ -44,21 +45,23 @@ int main() {
 }
 
 /**
-We set a constant viscosity corresponding to a Reynolds number of 160,
-based on the cylinder diameter (0.125) and the inflow velocity (1). */
+We set a constant viscosity based on the Reynolds number, the cylinder
+diameter $D$ and the inflow velocity $U0$. */
+
+double D = 0.125, U0 = 1.;
 
 event properties (i++)
 {
   foreach_face()
-    muv.x[] = fm.x[]*0.125/Reynolds;
+    muv.x[] = fm.x[]*D*U0/Reynolds;
 }
 
 /**
-The fluid is injected on the left boundary with a unit velocity. The
+The fluid is injected on the left boundary with velocity $U0$. The
 tracer is injected in the lower-half of the left boundary. An outflow
 condition is used on the right boundary. */
 
-u.n[left]  = dirichlet(1.);
+u.n[left]  = dirichlet(U0);
 p[left]    = neumann(0.);
 pf[left]   = neumann(0.);
 f[left]    = dirichlet(y < 0);
@@ -81,13 +84,13 @@ event init (t = 0)
   circle of diameter 0.125. */
 
   solid (cs, fs, intersection (intersection (0.5 - y, 0.5 + y),
-			       sq(x) + sq(y) - sq(0.125/2.)));
+			       sqrt(sq(x) + sq(y)) - D/2.));
 
   /**
   We set the initial velocity field. */
   
   foreach()
-    u.x[] = cs[] ? 1. : 0.;
+    u.x[] = cs[] ? U0 : 0.;
 }
 
 /**

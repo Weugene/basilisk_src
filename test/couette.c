@@ -11,6 +11,14 @@ between two rotating cylinders. */
 
 int main()
 {
+
+  /**
+  Space and time are dimensionless. This is necessary to be able to
+  use the 'mu = fm' trick. */
+
+  size (1. [0]);
+  DT = 1. [0];
+  
   origin (-L0/2., -L0/2.);
   
   stokes = true;

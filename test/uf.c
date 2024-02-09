@@ -12,7 +12,6 @@ interpolation of the face velocities (see [/src/embed.h]()). */
 
 #include "embed.h"
 #include "navier-stokes/centered.h"
-#include "view.h"
 
 int main()
 {
@@ -22,7 +21,7 @@ int main()
   
   stokes = true;
   DT = 2e-5;
-  TOLERANCE = HUGE;
+  TOLERANCE = HUGE [*];
   NITERMIN = 10;
   N = 32;
 

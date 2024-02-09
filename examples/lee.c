@@ -97,8 +97,9 @@ We use the 1D (horizontal) non-hydrostatic multilayer solver. */
 The Boussinesq density perturbation is given as a function of the
 "temperature" field $T$. */
 
-#define drho(T) (1e-3*(T - 13.25)/(8. - 13.25))
-#define T0(z) (8. + (13.25 - 8.)*(z + 100.)/100.)
+double drho0 = 1e-3, T0 = 13.25, T1 = 8., H0 = 100.;
+#define drho(T) (drho0*(T0 - T)/(T0 - T1))
+#define T0(z) (T1 + (T0 - T1)*(z + H0)/H0)
 #include "layered/dr.h"
 
 /**
@@ -116,7 +117,7 @@ double nu_H = 0.1;
 
 int main()
 {
-  L0 = 21500;
+  L0 = 21500 [1];
   X0 = - 6500;
   G = 9.81;
 
@@ -145,7 +146,7 @@ int main()
   CFL criterion is correspondingly smaller. This restriction is
   avoided with the vertically-Lagrangian solver. */
   
-  DT = 100.;
+  DT = 100. [0,1];
   
   nu = 1e-3;
   
@@ -156,7 +157,7 @@ int main()
 /**
 The M2 tidal period (in seconds). */
 
-#define M2 (12.*3600. + 25.2*60.)
+const double M2 = 12.*3600. + 25.2*60.;
 
 /**
 The temperature profile $T0(z)$ is imposed at inflow. The slightly
@@ -178,22 +179,25 @@ The M2 tide with an amplitude of 0.3 m/s is imposed at inflow (left
 boundary) as well as the temperature profile. The outflow (right
 boundary) is free. */
 
+double U2 = 0.3;
+
 event init (i = 0)
 {
-  u.n[left]  = dirichlet (0.3*sin(2.*pi*(t/M2)));
+  u.n[left]  = dirichlet (U2*sin(2.*pi*(t/M2)));
   u.n[right] = neumann(0.);
-  h[right] = dirichlet(100./nl);
+  h[right] = dirichlet(H0/nl);
   T[left] = Tleft(point);
   T[right] = Tleft(point);
 
   /**
   The sill geometry, initial layer depths and initial temperature
   profile. */
-  
+
+  double a = 35., b = 85., c = 500. [1];
   foreach() {
     zb[] = x < 0. ?
-      -50. + 35./(1. + pow(x/500.,4)) :
-      -100. + 85./(1. + pow(x/500.,4));
+      -H0/2. + a/(1. + pow(x/c,4)) :
+      -H0 + b/(1. + pow(x/c,4));
     double z = zb[];
     foreach_layer() {      
       h[] = - zb[]/nl;

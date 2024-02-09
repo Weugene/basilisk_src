@@ -47,10 +47,12 @@ desired sinusoidal wave form. We have to tune the amplitude to obtain
 the required amplitude as measured in the experiment at gauge 4. The
 period of 2.02 seconds matches that of the experiment. */
 
+const double omega = 2.*pi/2.02;
+
 event init (i = 0)
 {
 
-  u.n[left]  = - radiation (0.03*sin(2.*pi*t/2.02));
+  u.n[left]  = - radiation (0.03*sin(omega*t));
   u.n[right] = + radiation (0);
   
   /**

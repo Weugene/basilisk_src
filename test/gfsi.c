@@ -13,11 +13,12 @@ int main()
   fclose (fp);
 
   output_cells (stdout);
-  
+
+  double k = 2.*pi;
   foreach() {
-    assert (fabs(a[] - sin(2.*pi*x)*cos(2.*pi*y)) < 1e-12);
-    assert (fabs(u.x[] - sin(2.*pi*x)*cos(2.*pi*y)) < 1e-12);
-    assert (fabs(u.y[] - sin(2.*pi*x)*cos(2.*pi*y)) < 1e-12);
+    assert (fabs(a[] - sin(k*x)*cos(k*y)) < 1e-12);
+    assert (fabs(u.x[] - sin(k*x)*cos(k*y)) < 1e-12);
+    assert (fabs(u.y[] - sin(k*x)*cos(k*y)) < 1e-12);
   }
 
   system ("gfsview-batch2D gfsi.gfs < /dev/null");

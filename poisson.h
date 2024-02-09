@@ -100,8 +100,8 @@ The maximum number of iterations is controlled by *NITERMAX* and the
 tolerance by *TOLERANCE* with the default values below. */
 
 int NITERMAX = 100, NITERMIN = 1;
-double TOLERANCE = 1e-3;
-double RELATIVE_RES_TOLERANCE = 0.1;
+double TOLERANCE = 1e-3 [*];
+
 /**
 Information about the convergence of the solver is returned in a structure. */
 
@@ -117,35 +117,30 @@ typedef struct {
 The user needs to provide a function which computes the residual field
 (and returns its maximum) as well as the relaxation function. The
 user-defined pointer *data* can be used to pass arguments to these
-functions. The optional number of relaxations is *nrelax* (default is
-one) and *res* is an optional list of fields used to store the
-residuals. The minimum level of the hierarchy can be set (default is
-zero i.e. the root cell). */
+functions. The optional number of relaxations is *nrelax* and *res* is
+an optional list of fields used to store the residuals. The minimum
+level of the hierarchy can be set (default is zero i.e. the root
+cell). */
 
-struct MGSolve {
-  scalar * a, * b;
-  double (* residual) (scalar * a, scalar * b, scalar * res,
-		       void * data);
-  void (* relax) (scalar * da, scalar * res, int depth, 
-		  void * data);
-  void * data;
-  
-  int nrelax;
-  scalar * res;
-  int minlevel;
-  double tolerance;
-};
-
-mgstats mg_solve (struct MGSolve p)
+mgstats mg_solve (scalar * a, scalar * b,
+		  double (* residual) (scalar * a, scalar * b, scalar * res,
+				       void * data),
+		  void (* relax) (scalar * da, scalar * res, int depth, 
+				  void * data),
+		  void * data = NULL,
+		  int nrelax = 4,
+		  scalar * res = NULL,
+		  int minlevel = 0,
+		  double tolerance = TOLERANCE)
 {
 
   /**
   We allocate a new correction and residual field for each of the scalars
   in *a*. */
 
-  scalar * da = list_clone (p.a), * res = p.res;
+  scalar * da = list_clone (a), * pres = res;
   if (!res)
-    res = list_clone (p.b);
+    res = list_clone (b);
 
   /**
   The boundary conditions for the correction fields are the
@@ -161,36 +156,31 @@ mgstats mg_solve (struct MGSolve p)
 
   mgstats s = {0};
   double sum = 0.;
+  scalar rhs = b[0];
   foreach (reduction(+:sum))
-    for (scalar s in p.b)
-      sum += s[];
+    sum += rhs[];
   s.sum = sum;
-  s.nrelax = p.nrelax > 0 ? p.nrelax : 4;
+  s.nrelax = nrelax > 0 ? nrelax : 4;
   
   /**
   Here we compute the initial residual field and its maximum. */
 
   double resb;
-  resb = s.resb = s.resa = p.residual (p.a, p.b, res, p.data);
+  resb = s.resb = s.resa = (* residual) (a, b, res, data);
 
   /**
   We then iterate until convergence or until *NITERMAX* is reached. Note
   also that we force the solver to apply at least one cycle, even if the
   initial residual is lower than *TOLERANCE*. */
-  double res_previous1 = 0;
-  double res_previous2 = 0;
-  int patient = 0;
-
-  if (p.tolerance == 0.)
-    p.tolerance = TOLERANCE;
+  
   for (s.i = 0;
-       s.i < NITERMAX && (s.i < NITERMIN || s.resa > p.tolerance);
+       s.i < NITERMAX && (s.i < NITERMIN || s.resa > tolerance);
        s.i++) {
-    mg_cycle (p.a, res, da, p.relax, p.data,
+    mg_cycle (a, res, da, relax, data,
 	      s.nrelax,
-	      p.minlevel,
+	      minlevel,
 	      grid->maxdepth);
-    s.resa = p.residual (p.a, p.b, res, p.data);
+    s.resa = (* residual) (a, b, res, data);
 
     /**
     We tune the number of relaxations so that the residual is reduced
@@ -199,7 +189,7 @@ mgstats mg_solve (struct MGSolve p)
     on the finest grid. */
 
 #if 1
-    if (s.resa > p.tolerance) {
+    if (s.resa > tolerance) {
       if (resb/s.resa < 1.2 && s.nrelax < 100)
 	s.nrelax++;
       else if (resb/s.resa > 10 && s.nrelax > 2)
@@ -213,44 +203,24 @@ mgstats mg_solve (struct MGSolve p)
 #endif
 
     resb = s.resa;
-//break if resudual does not change. Weugene correction
-#ifdef RELATIVE_RESIDUAL
-      double res1 = 0.5*(res_previous1 + res_previous2);
-      double res2 = 0.5*(res_previous1 + s.resa);
-	  double res_rel = fabs(res1 - res2)/(res2 + 1e-30);
-      if (s.i == 2 && fabs(s.resa) < 1e-30) break;
-      if( res_rel < RELATIVE_RES_TOLERANCE && patient > 3){
-          scalar v = p.a[0];
-          fprintf (ferr,
-             "WARNING: Relative residual did not reach convergence for %s after %d iterations\n"
-             "  rel_res: %g res: %g prev_res: %g %g sum: %g nrelax: %d\n",
-             v.name, s.i, res_rel, s.resa, res_previous1, res_previous2, s.sum, s.nrelax), fflush (ferr);;
-          break;
-      }
-      else{
-          res_previous2 = res_previous1;
-          res_previous1 = s.resa;
-          patient++;
-      }
-#endif
   }
-  s.minlevel = p.minlevel;
+  s.minlevel = minlevel;
   
   /**
   If we have not satisfied the tolerance, we warn the user. */
 
-  if (s.resa > p.tolerance) {
-    scalar v = p.a[0];
+  if (s.resa > tolerance) {
+    scalar v = a[0]; // fixme: should not be necessary
     fprintf (ferr, 
 	     "WARNING: convergence for %s not reached after %d iterations\n"
-	     "  res: %g sum: %g nrelax: %d\n", v.name,
-	     s.i, s.resa, s.sum, s.nrelax), fflush (ferr);
+	     "  res: %g sum: %g nrelax: %d tolerance: %g\n", v.name,
+	     s.i, s.resa, s.sum, s.nrelax, tolerance), fflush (ferr);
   }
     
   /**
   We deallocate the residual and correction fields and free the lists. */
 
-  if (!p.res)
+  if (!pres)
     delete (res), free (res);
   delete (da), free (da);
 
@@ -336,7 +306,7 @@ static void relax (scalar * al, scalar * bl, int l, void * data)
       d += e*sq(Delta);
     }
     if (!d)
-      c[] = b[] = 0.;
+      c[] = 0., b[] = 0.;
     else
 #endif // EMBED
       c[] = n/d;
@@ -408,7 +378,7 @@ static double residual (scalar * al, scalar * bl, scalar * resl, void * data)
   }
 #endif // !TREE
 #ifdef DEBUG_MULTIGRID
-  fprintf(ferr, "maxres=%15.12g\n", maxres);
+  fprintf(ferr, "maxres=%15.12g\n", maxres); // weugene
 #endif
   return maxres;
 }
@@ -422,7 +392,14 @@ $$
 \nabla\cdot (\alpha\nabla a) + \lambda a = b
 $$ */
 
-mgstats poisson (struct Poisson p)
+mgstats poisson (scalar a, scalar b,
+		 (const) face vector alpha = {{-1}},
+		 (const) scalar lambda = {-1},
+		 double tolerance = 0.,
+		 int nrelax = 4,
+		 int minlevel = 0,
+		 scalar * res = NULL,
+		 double (* flux) (Point, scalar, vector, double *) = NULL)
 {
 
   /**
@@ -430,16 +407,16 @@ mgstats poisson (struct Poisson p)
   unity vector (resp. zero scalar) fields. Note that the user is free to
   provide $\alpha$ and $\beta$ as constant fields. */
 
-  if (!p.alpha.x.i)
-    p.alpha = unityf;
-  if (!p.lambda.i)
-    p.lambda = zeroc;
+  if (alpha.x.i < 0)
+    alpha = unityf;
+  if (lambda.i < 0) {
+    const scalar zeroc[] = 0.; // fixme
+    lambda = zeroc;
+  }
 
   /**
   We need $\alpha$ and $\lambda$ on all levels of the grid. */
 
-  face vector alpha = p.alpha;
-  scalar lambda = p.lambda;
   restriction ({alpha,lambda});
 
   /**
@@ -447,21 +424,23 @@ mgstats poisson (struct Poisson p)
   solver. */
 
   double defaultol = TOLERANCE;
-  if (p.tolerance)
-    TOLERANCE = p.tolerance;
+  if (tolerance)
+    TOLERANCE = tolerance;
 
-  scalar a = p.a, b = p.b;
+  struct Poisson p = {a, b, alpha, lambda, tolerance, nrelax, minlevel, res };
 #if EMBED
-  if (!p.embed_flux && a.boundary[embed] != symmetry)
+  if (!flux && a.boundary[embed] != symmetry)
     p.embed_flux = embed_flux;
+  else
+    p.embed_flux = flux;
 #endif // EMBED
-  mgstats s = mg_solve ({a}, {b}, residual, relax,
-			&p, p.nrelax, p.res, minlevel = max(1, p.minlevel));
+  mgstats s = mg_solve ({a}, {b}, residual, relax, &p,
+			nrelax, res, max(1, minlevel));
 
   /**
   We restore the default. */
 
-  if (p.tolerance)
+  if (tolerance)
     TOLERANCE = defaultol;
 
   return s;
@@ -484,26 +463,12 @@ $$
 \nabla\cdot(\alpha\nabla p) = \frac{\nabla\cdot\mathbf{u}_f}{\Delta t}
 $$ */
 
-struct Project {
-  face vector uf;
-  scalar p;
-  face vector alpha; // optional: default unityf
-  double dt;         // optional: default one
-  int nrelax;        // optional: default four
-  scalar fs;
-  vector target_U;   // optional: default 0
-  vector u;
-  double eta_s;         // optional: default 1e-10
-};
-
 trace
-mgstats project (struct Project q)
+mgstats project (face vector uf, scalar p,
+		 (const) face vector alpha = unityf,
+		 double dt = 1.,
+		 int nrelax = 4)
 {
-  face vector uf = q.uf;
-  scalar p = q.p;
-  (const) face vector alpha = q.alpha.x.i ? q.alpha : unityf;
-  double dt = q.dt ? q.dt : 1.;
-  int nrelax = q.nrelax ? q.nrelax : 4;
   
   /**
   We allocate a local scalar field and compute the divergence of

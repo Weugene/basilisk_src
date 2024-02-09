@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include "utils.h"
+#include "TinyPngOut.h"
 
 /**
 ## Various helper functions
@@ -39,11 +40,51 @@ void gl_write_image (FILE * fp, const GLubyte * buffer,
 }
 
 /**
+A helper function to write a PNG file from a RGB buffer. Downsampling
+by averaging is performed if *samples* is larger than one. */
+
+void gl_write_image_png (FILE * fp, const GLubyte * buffer,
+			 unsigned width, unsigned height, unsigned samples)
+{
+  const GLubyte *ptr = buffer;
+
+  if (samples < 1)
+    samples = 1;
+  if (samples > 4)
+    samples = 4;
+
+  width /= samples, height /= samples;
+  struct TinyPngOut pngout;
+  enum TinyPngOut_Status status = TinyPngOut_init (&pngout, width, height, fp);
+  if (status != TINYPNGOUT_OK) {
+    fprintf (stderr, "error: TinyPngOut init failed\n");
+    return;
+  }
+
+  int x, y, j, k;
+  for (y = height - 1; y >= 0; y--)
+    for (x = 0; x < width; x++) {
+      int r = 0, g = 0, b = 0;
+      for (j = 0; j < samples; j++)
+	for (k = 0; k < samples; k++) {
+	  int i = (((y*samples + j)*width + x)*samples + k)*4;
+	  if (ptr)
+	    r += ptr[i], g += ptr[i+1], b += ptr[i+2];
+	}
+      uint8_t pixel[3] = { r/samples/samples, g/samples/samples, b/samples/samples };
+      status = TinyPngOut_write (&pngout, pixel, 1);
+      if (status != TINYPNGOUT_OK) {
+	fprintf (stderr, "error: TinyPngOut write failed\n");
+	return;
+      }
+    }
+}
+
+/**
 This is the basic OpenGL setup. */
 
 void init_gl() {
   GLfloat light0_pos[4]   = { 0.0, 0.0, 50.0, 0.0 };
-  GLfloat light0_color[4] = { 1., 1., 1., 1.0 }; /* white light */
 
   glDisable (GL_CULL_FACE);
   glEnable (GL_DEPTH_TEST);
@@ -58,7 +99,8 @@ void init_gl() {
   /* light */
   glLightModeli (GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
   glLightfv (GL_LIGHT0, GL_POSITION, light0_pos);
-  glLightfv (GL_LIGHT0, GL_DIFFUSE,  light0_color);
+  GLfloat diffuse[4] = { 0.8, 0.8, 0.8, 1 };
+  glLightfv (GL_LIGHT0, GL_DIFFUSE, diffuse);
   glEnable (GL_LIGHT0);
   glEnable (GL_LIGHTING);
 
@@ -101,7 +143,7 @@ void gl_draw_texture (GLuint id, int width, int height)
 #define RC(r,c) m[(r)+(c)*4]
 #define RCM(m,r,c) (m)[(r)+(c)*4]
 
-void matrix_multiply (float * m, float * n)
+void matrix_multiply (float * m, const float * n)
 {
   float o[16];
   int i;
@@ -140,7 +182,7 @@ void matrix_multiply (float * m, float * n)
           RCM(o,3,2)*RCM(n,2,3)+RCM(o,3,3)*RCM(n,3,3);
 }
 
-void vector_multiply (float * v, float * m)
+void vector_multiply (float * v, const float * m)
 {
   float o[4];
   int i;
@@ -271,3 +313,67 @@ float sphere_diameter (double x, double y, double z, double r, Frustum * f)
   return rp;
 }
 
+/*
+  Replacement for gluPerspective in GLU from:
+  https://www.khronos.org/opengl/wiki/GluPerspective_code
+*/
+static
+void glhFrustumf2(double *matrix, double left, double right,
+		  double bottom, double top,
+                  double znear, double zfar)
+{
+  double temp, temp2, temp3, temp4;
+  temp = 2.0 * znear;
+  temp2 = right - left;
+  temp3 = top - bottom;
+  temp4 = zfar - znear;
+  matrix[0] = temp / temp2;
+  matrix[1] = 0.0;
+  matrix[2] = 0.0;
+  matrix[3] = 0.0;
+  matrix[4] = 0.0;
+  matrix[5] = temp / temp3;
+  matrix[6] = 0.0;
+  matrix[7] = 0.0;
+  matrix[8] = (right + left) / temp2;
+  matrix[9] = (top + bottom) / temp3;
+  matrix[10] = (-zfar - znear) / temp4;
+  matrix[11] = -1.0;
+  matrix[12] = 0.0;
+  matrix[13] = 0.0;
+  matrix[14] = (-temp * zfar) / temp4;
+  matrix[15] = 0.0;
+}
+
+void gl_perspective (double fovy, double aspect, double znear, double zfar)
+{
+  double matrix[16];
+  double ymax, xmax;
+  ymax = znear * tanf(fovy*M_PI/360.0);
+  // ymin = -ymax;
+  // xmin = -ymax * aspectRatio;
+  xmax = ymax * aspect;
+  glhFrustumf2 (matrix, -xmax, xmax, -ymax, ymax, znear, zfar);
+  glMatrixMode (GL_PROJECTION);
+  glLoadMatrixd (matrix);
+}
+
+// derived from: Mesa-7.8.2/src/glu/sgi/libutil/project.c:234
+int gl_project (float objx, float objy, float objz, 
+		const float modelMatrix[16], 
+		const float projMatrix[16],
+		const int viewport[4],
+		float *winx, float *winy, float *winz)
+{
+  float in[4] = { objx, objy, objz, 1. };
+
+  vector_multiply (in, modelMatrix);
+  vector_multiply (in, projMatrix);
+  
+  if (in[3] == 0.0) return 0;
+
+  *winx = viewport[0] + viewport[2]*(in[0]/in[3] + 1.)/2.;
+  *winy = viewport[1] + viewport[3]*(in[1]/in[3] + 1.)/2.;
+  *winz = (in[2]/in[3] + 1.)/2.;
+  return 1;
+}

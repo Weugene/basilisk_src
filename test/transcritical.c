@@ -13,8 +13,9 @@ u.n[right] = neumann(0);
 
 event init (t = 0)
 {
+  double a = 0.25, k = pi/0.1;
   foreach() {
-    zb[] = 0.25*(cos(pi*x/0.1) + 1.)*(fabs(x) < 0.1);
+    zb[] = a*(cos(k*x) + 1.)*(fabs(x) < 0.1);
     u.x[] = 0.3;
     h[] = 1. - zb[];
   }

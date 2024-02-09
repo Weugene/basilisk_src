@@ -72,8 +72,10 @@ $\mathbf{q}$ are already applied by the [all Mach
 solver](all-mach.h). */
 
 event init (i = 0) {
-  foreach()
+  foreach() {
     p[] = G*sq(h[])/2.;
+    dimensional (h[] == Delta);
+  }
 }
 
 /**

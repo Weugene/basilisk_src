@@ -43,7 +43,7 @@ event defaults (i = 0)
 trace
 void run()
 {
-  t = 0., iter = 0;
+  t = 0., iter = 0; dimensional (dt == DT);
   init_grid (N);
 
   // main loop

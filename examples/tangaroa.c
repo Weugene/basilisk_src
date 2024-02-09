@@ -85,7 +85,7 @@ long. If we assume that it moves at 20 knots (twice its actual cruise
 speed), this gives a Froude number of approx 0.4. */
 
 int LEVEL = 9;
-double FROUDE = 0.4;
+double FROUDE = 0.4, Uship = 1., Lship = 1. [1];
 
 /**
 We need additional (fraction) fields for the ship geometry and for the
@@ -103,15 +103,14 @@ int main (int argc, char * argv[])
     
   init_grid (32);
 
-  rho1 = 1.; // water
-  rho2 = 1./815.; // air
+  rho1 = 1. [0];    // water
+  rho2 = rho1/815.; // air
 
   /**
-  The length of the ship is unity and the domain is five times
-  larger. We change the origin so that the ship is not too close to
-  the inflow. */
+  The domain is five times larger than the ship. We change the origin
+  so that the ship is not too close to the inflow. */
 	      
-  size (5.);
+  size (5.*Lship);
   origin (-L0/2.,-L0/3.,-L0/2.);
 
   /**
@@ -122,10 +121,9 @@ int main (int argc, char * argv[])
     s.refine = s.prolongation = fraction_refine;
 
   /**
-  Since the ship length is one and the velocity one, the acceleration
-  of gravity is...*/
-	      
-  G.z = - 1./sq(FROUDE);
+  The acceleration of gravity is given by the Froude number i.e. */
+
+  G.z = - sq(Uship/FROUDE)/Lship;
   run();
 }
 
@@ -135,7 +133,7 @@ int main (int argc, char * argv[])
 The inflow condition fixes the velocity (unity) and the water level
 (using `f0`). */
 	      
-u.n[bottom] = dirichlet(1);
+u.n[bottom] = dirichlet(Uship);
 p[bottom]   = neumann(0.);
 pf[bottom]  = neumann(0.);
 f[bottom]   = f0[];
@@ -170,14 +168,14 @@ and velocity field. */
 event init (t = 0) {
   if (!restore (file = "restart")) {
     FILE * fp = fopen ("tangaroa.stl", "r");
-    fraction_from_stl (tangaroa, fp, 5e-4, LEVEL);
+    fraction_from_stl (tangaroa, fp, 5e-4[0], LEVEL);
     fclose (fp);
     
     fraction (f0, - z);
 
     foreach() {
       f[] = f0[];
-      u.y[] = 1.;
+      u.y[] = Uship;
     }
   }
 
@@ -318,7 +316,8 @@ with the following `run.sh` script
 set -x
 cd ${BRIDGE_MSUB_PWD}
 
-mpicc -Wall -std=c99 -O2 _tangaroa.c -o tangaroa -I$HOME -L$HOME/gl -lglutils -lfb_osmesa -lOSMesa -lGLU -lm
+mpicc -Wall -std=c99 -D_XOPEN_SOURCE=700 -O2 _tangaroa.c -o tangaroa \
+      -L$HOME/gl -lglutils -lfb_tiny -lm
 ccc_mprun -n ${BRIDGE_MSUB_NPROC} ./tangaroa -m WALLTIME 12 0.4 \
     2>> log-${BRIDGE_MSUB_NPROC} >> out-${BRIDGE_MSUB_NPROC}
 ~~~

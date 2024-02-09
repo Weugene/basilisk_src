@@ -31,8 +31,9 @@ The left boundary is the "bottom" of the container. The azimuthal
 velocity component *w* on the bottom disk is $\Omega r$ with the
 angular velocity $\Omega = 1$ and $r = y$. */
 
+double Omega = 1.;
 u.t[left] = dirichlet(0);
-w[left]   = dirichlet(y);
+w[left]   = dirichlet(Omega*y);
 
 /**
 The "top" boundary is a no-slip stationary wall. */
@@ -77,12 +78,13 @@ $$
 The values correspond to those used by Yang for figure 5.9 in his PhD
 (see also p. 106). */
 
-double G = 0.25,
-       Fr = 0.88,
-       Re = 3063,
-       We = 3153,
-       rhor = 1.205/1.2107e3,
-       mur = 18.2e-6/6.09e-2;
+double R = 1 [1],
+       G = 0.25 [0],
+       Fr = 0.88 [0],
+       Re = 3063 [0],
+       We = 3153 [0],
+       rhor = 1.205/1.2107e3 [0],
+       mur = 18.2e-6/6.09e-2 [0];
 
 /**
 ## Setup
@@ -96,11 +98,11 @@ very little influence but slows down the calculation. */
 int main()
 {
   N = 128;
-  mu1 = 1./Re;
+  mu1 = sq(R)*Omega/Re;
   rho2 = rho1*rhor;
   mu2 = mu1*mur;
   //  f.sigma = 1./We;
-  DT = 0.1;
+  DT = 0.1 [0,1];
   run();
 }
 
@@ -111,14 +113,14 @@ event acceleration (i++)
 {
   face vector av = a;
   foreach_face(x)
-    av.x[] -= 1./Fr;
+    av.x[] -= R*sq(Omega)/Fr;
 }
 
 /**
 The initial interface is flat and positioned at $z = RG$. */
 
 event init (i = 0) {
-  fraction (f, G - x);
+  fraction (f, R*G - x);
 }
 
 #if 0

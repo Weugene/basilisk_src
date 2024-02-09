@@ -3,7 +3,6 @@
 #include <stdlib.h>
   
 #include "ast.h"
-#include "allocator.h"
 
 int  yylex (Ast ** lvalp, AstRoot * parse);
 void yyerror (AstRoot * parse, Ast * root, char const *);
