@@ -82,3 +82,6 @@ bview.log~
 # basilisk execution files
 bview2D
 bview3D
+
+# dependencies
+Makefile.deps
