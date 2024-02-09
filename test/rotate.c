@@ -30,9 +30,10 @@ event velocity (i++) {
   adapt_wavelet ({c}, &cmax, MAXLEVEL, list = {c});
 #endif
 
+  double a = -8.;
   trash ({u});
-  foreach_face(x) u.x[] = -8.*y;
-  foreach_face(y) u.y[] =  8.*x;
+  foreach_face(x) u.x[] = - a*y;
+  foreach_face(y) u.y[] =   a*x;
 }
 
 event logfile (t = {0,end}) {

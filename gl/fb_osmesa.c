@@ -7,12 +7,14 @@
 struct _framebuffer {
   OSMesaContext ctx;
   unsigned char * image;
+  float * depth;
   unsigned width, height;
 };
 
 void framebuffer_destroy (framebuffer * p)
 {
   free (p->image);
+  free (p->depth);
   OSMesaDestroyContext (p->ctx);
   free (p);
 }
@@ -24,7 +26,8 @@ framebuffer * framebuffer_new (unsigned width, unsigned height)
   p->width = width;
   p->height = height;
   p->image = malloc (p->width*p->height*4*sizeof (char));
-
+  p->depth = NULL;
+  
   /* Create an RGBA-mode context for OSMesa */
 #if 1 // OSMESA_MAJOR_VERSION * 100 + OSMESA_MINOR_VERSION >= 305
   /* specify Z, stencil, accum sizes */
@@ -51,14 +54,13 @@ unsigned char * framebuffer_image (framebuffer * p)
   return p->image;
 }
 
-fbdepth_t * framebuffer_depth (framebuffer * p)
+float * framebuffer_depth (framebuffer * p)
 {
   unsigned int * depth;
   GLint width, height, bytesPerValue;
   OSMesaGetDepthBuffer (p->ctx, &width, &height, &bytesPerValue,
 			(void **)&depth);
   assert (p->width == width && p->height == height && bytesPerValue == 4);
-  assert (sizeof(fbdepth_t) == bytesPerValue);
 #if GALLIUM
   // fix for bug in gallium/libosmesa
   // the depth buffer is flipped vertically
@@ -72,5 +74,11 @@ fbdepth_t * framebuffer_depth (framebuffer * p)
       depth[(height - 1 - j)*width + i] = tmp;
     }
 #endif // GALLIUM
-  return depth;
+  if (!p->depth)
+    p->depth = (float *) malloc (p->width*p->height*sizeof (float));
+  float * d = p->depth;
+  unsigned int * z = depth;
+  for (unsigned long i = 0; i < p->width*p->height; i++, z++, d++)
+    *d = *z;
+  return p->depth;
 }

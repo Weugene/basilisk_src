@@ -27,7 +27,7 @@ int main()
 {
   X0 = -0.5;
   N = 64;
-  TOLERANCE = 1e-12;
+  TOLERANCE = 1e-12 [*];
   f1.gradient = minmod2;
   run();
 }

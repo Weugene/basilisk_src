@@ -296,6 +296,14 @@ char *ws_getaddress(int fd)
 	return (client);
 }
 
+#ifndef MSG_NOSIGNAL
+/* dirty fix for MacOSX, will not block sigpipe, this should be fixed
+   properly, maybe using something like this:
+   https://gitlab.freedesktop.org/spice/spice/-/issues/39, Mac users
+   are welcome to submit a patch... */
+# define MSG_NOSIGNAL 0
+#endif
+
 /* Block SIGPIPE as explained here:
    https://stackoverflow.com/questions/108183/how-to-prevent-sigpipes-or-handle-them-properly */
 

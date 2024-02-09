@@ -3,6 +3,7 @@
 
 int main ()
 {
+  size (1.[0]);
   FILE * fp = popen ("xyz2kdt terrain", "w");
   for (double x = 0.; x <= 1.1; x += 0.005)
     for (double y = 0.; y <= 1.1; y += 0.005)

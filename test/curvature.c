@@ -103,6 +103,7 @@ void sample_circles (int nr, double R, int levelmax, norm * n, cstats * sc)
 
 int main()
 {
+  size (1. [0]); // dimensionless
   origin (-0.5, -0.5, -0.5);
   init_grid (N);
   

@@ -10,6 +10,13 @@ gravity in an inclined periodic channel. */
 
 int main()
 {
+  /**
+  Space and time are dimensionless. This is necessary to be able to
+  use the 'mu = fm' trick. */
+
+  size (1. [0]);
+  DT = HUGE [0];
+  
   origin (-0.5, -0.5);
   periodic (right);
   periodic (top);

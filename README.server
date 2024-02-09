@@ -19,7 +19,6 @@ $HOME/include/gl/gl2ps/gl2ps.h
 $HOME/bin/ppm2mpeg
 $HOME/bin/ppm2mp4
 $HOME/bin/ppm2gif
-$HOME/bin/sequence
 $HOME/bin/xyz2kdt
 ~~~
 
@@ -49,7 +48,7 @@ export CADNACC="clang -D_CADNA=1 -x c++ -m64 \
         -Wno-address-of-array-temporary"
 
 # OpenGL libraries
-export OPENGLIBS="-lfb_osmesa -lGLU -lOSMesa"
+export OPENGLIBS="-lfb_tiny"
 
 # howto kill tests
 

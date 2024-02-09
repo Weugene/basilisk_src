@@ -30,7 +30,7 @@ static double bflux (struct Eta_b p, double eta_b)
   double Q = 0.;
   scalar limit = p.limit;
   foreach_boundary (p.b, reduction(+:Q))
-    if (!limit.i || limit[] == p.value) {
+    if (limit.i < 0 || limit[] == p.value) {
       scalar u_n = ig ? u.x : u.y; // normal velocity component  
       double sign = - (ig + jg), ub = u_n[]*sign;
       double hn = max (eta_b - zb[], 0.), hp = max(h[],0.);
@@ -84,25 +84,26 @@ Given a target flux $Q_b$ and a boundary $b$ (optionally limited to
 points for which `limit[] = value`), this function returns the
 corresponding water level $\eta_b$. */
 
-double eta_b (struct Eta_b p)
+double eta_b (double Q_b, bid b,
+	      scalar limit = {-1}, double value = 0, double prec = 0.001)
 {
   double zmin = HUGE, etas = 0., hs = 0.;
-  scalar limit = p.limit;
-  foreach_boundary (p.b, reduction(+:etas) reduction(+:hs) reduction(min:zmin))
-    if (!limit.i || limit[] == p.value) {
+  foreach_boundary (b, reduction(+:etas) reduction(+:hs) reduction(min:zmin))
+    if (limit.i < 0 || limit[] == value) {
       if (zb[] < zmin)
 	zmin = zb[];
       etas += Delta*h[]*eta[];
       hs += Delta*h[];
     }
 
-  if (p.Q_b <= 0.)
+  if (Q_b <= 0.)
     return zmin - 1.;
 
   /**
   We try to find good bounds on the solution. */
   
   double etasup = hs > 0. ? etas/hs : zmin;
+  struct Eta_b p = { Q_b, b, limit, value, prec };
   double Qsup = bflux (p, etasup), etainf = zmin, Qinf = 0.;
   double h0 = etasup - zmin;
   if (h0 < dry)
@@ -115,7 +116,5 @@ double eta_b (struct Eta_b p)
   }
   if (n >= 100)
     fprintf (stderr, "WARNING: eta_b() not converged\n");
-    
-  if (!p.prec) p.prec = 0.001; // 0.1% by default
   return falsepos (p, etainf, Qinf, etasup, Qsup);
 }

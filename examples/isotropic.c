@@ -26,7 +26,7 @@ We monitor performance statistics and control the maximum runtime. */
 #include "navier-stokes/perfs.h"
 #include "maxruntime.h"
 
-#define MU 0.01
+const double MU = 0.01;
 
 /**
 We need to store the variable forcing term. */
@@ -48,7 +48,7 @@ int main (int argc, char * argv[])
   /**
   The domain is $(2\pi)^3$ and triply-periodic. */
   
-  L0 = 2.*pi;
+  L0 = 2.*pi [1];
   foreach_dimension()
     periodic (right);
 
@@ -70,11 +70,12 @@ The initial condition is "ABC" flow. This is a laminar base flow that
 is easy to implement in both Basilisk and a spectral code. */
 
 event init (i = 0) {
+  double u0 = 1., k = 1.;
   if (!restore (file = "restart"))
     foreach() {
-      u.x[] = cos(y) + sin(z);
-      u.y[] = sin(x) + cos(z);
-      u.z[] = cos(x) + sin(y);
+      u.x[] = u0*(cos(k*y) + sin(k*z));
+      u.y[] = u0*(sin(k*x) + cos(k*z));
+      u.z[] = u0*(cos(k*x) + sin(k*y));
     }
 }
 
@@ -90,8 +91,9 @@ event acceleration (i++) {
     stats s = statsf(u.x);
     ubar.x = s.sum/s.volume;
   }
+  double a = 0.1;
   foreach_face()
-    av.x[] += 0.1*((u.x[] + u.x[-1])/2. - ubar.x);
+    av.x[] += a*((u.x[] + u.x[-1])/2. - ubar.x);
 }
 
 /**
@@ -177,8 +179,8 @@ On occigen (using 512 cores)
 module purge
 module load openmpi
 module load intel
-mpicc -Wall -O2 -std=c99 _isotropic.c -o isotropic \
-        -I$HOME -L$HOME/gl -lglutils -lfb_osmesa -lGLU -lOSMesa -lm
+mpicc -Wall -O2 -std=c99 -D_XOPEN_SOURCE=700 _isotropic.c -o isotropic \
+        -I$HOME -L$HOME/gl -lglutils -lfb_tiny -lm
 sed 's/WALLTIME/10:00/g' run.sh | sbatch
 ~~~
 
@@ -222,8 +224,8 @@ On mesu (using 512 cores)
 
 ~~~bash
 module load mpt
-mpicc -Wall -O2 -std=c99 _isotropic.c -o isotropic -I$HOME -L$HOME/gl -lglutils \
-	-lfb_osmesa -lGLU -lOSMesa -lm
+mpicc -Wall -O2 -std=c99 -D_XOPEN_SOURCE=700 _isotropic.c -o isotropic \
+      -L$HOME/gl -lglutils -lfb_tiny -lm
 sed 's/WALLTIME/10:00/g' run.sh | qsub
 ~~~
 
@@ -299,8 +301,9 @@ On the local machine
 On irene
 
 ~~~bash
-mpicc -Wall -O2 -std=c99 -xCORE-AVX512 _isotropic.c -o isotropic \
-        -I$HOME -L$HOME/gl -lglutils -lfb_osmesa -lGLU -lOSMesa -lm
+mpicc -Wall -O2 -std=c99 -D_XOPEN_SOURCE=700 -xCORE-AVX512 \
+      _isotropic.c -o isotropic \
+      -L$HOME/gl -lglutils -lfb_tiny -lm
 sed -e 's/WALLTIME/600/g' -e 's/LEVEL/7/g' run.sh | ccc_msub -n 512
 ~~~
 

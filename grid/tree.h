@@ -1626,20 +1626,18 @@ void check_two_one (void)
 }
 #endif
 
-struct _locate { double x, y, z; };
-
-Point locate (struct _locate p)
+Point locate (double xp = 0., double yp = 0., double zp = 0.)
 {
   for (int l = depth(); l >= 0; l--) {
     Point point = {0};
     point.level = l;
     int n = 1 << point.level;
-    point.i = (p.x - X0)/L0*n + GHOSTS;
+    point.i = (xp - X0)/L0*n + GHOSTS;
 #if dimension >= 2
-    point.j = (p.y - Y0)/L0*n + GHOSTS;
+    point.j = (yp - Y0)/L0*n + GHOSTS;
 #endif
 #if dimension >= 3
-    point.k = (p.z - Z0)/L0*n + GHOSTS;
+    point.k = (zp - Z0)/L0*n + GHOSTS;
 #endif
     if (point.i >= 0 && point.i < n + 2*GHOSTS
 #if dimension >= 2

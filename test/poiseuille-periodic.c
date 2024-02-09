@@ -9,7 +9,7 @@ int main() {
   dimensions (nx = 1);
   
   stokes = true;
-  TOLERANCE = 1e-5;
+  TOLERANCE = 1e-5 [*];
   
   u.t[left] = dirichlet(0);
   u.t[right] = dirichlet(0);
@@ -41,8 +41,9 @@ event profile (t = end) {
   foreach()
     fprintf (stdout, "%g %g %g %g %g\n", x, y, u.x[], u.y[], p[]);
   scalar e[];
+  double a = 0.5;
   foreach()
-    e[] = u.y[] - 0.5*(0.25 - x*x);
+    e[] = u.y[] - a*(0.25 - x*x);
   norm n = normf (e);
   fprintf (stderr, "%d %g %g %g\n", N, n.avg, n.rms, n.max);
 }

@@ -30,9 +30,11 @@ event tracer_advection (i++)
 int main() {
 
   /**
-  The domain is unity, centered on the origin and periodic in all
-  directions. */
-  
+  Space and time are dimensionless. The domain is unity, centered on
+  the origin and periodic in all directions. */
+
+  size (1. [0]);
+  DT = HUGE [0];
   origin (-0.5,-0.5);
   foreach_dimension()
     periodic (right);

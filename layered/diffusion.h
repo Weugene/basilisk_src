@@ -131,7 +131,12 @@ i.e. $\dot{\mathbf{u}}_t = 0$, $\mathbf{\lambda}_b = 0$, $\mathbf{u}_b
 = 0$. */
 
 double nu = 0.;
-(const) vector lambda_b = zerof, dut = zerof, u_b = zerof;
+/*
+fixme: should just be:
+(const) vector lambda_b[] = {0,0,0}, dut[] = {0,0,0}, u_b[] = {0,0,0};
+*/
+const vector lambda0[] = {0,0,0}, dut0[] = {0,0,0}, u_b0[] = {0,0,0};
+(const) vector lambda_b = lambda0, dut = dut0, u_b = u_b0;
 
 /**
 In the [layered solver](hydro.h), vertical viscosity is applied to the

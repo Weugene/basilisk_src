@@ -45,6 +45,7 @@ We choose a small Reynolds number and a small slope. */
 
 double Re = 10.;
 double s = 1./1000.;
+double h0 = 1.;
 
 double du0;
 #if !ML
@@ -55,12 +56,12 @@ vector duv[];
 
 int main()
 {
-  L0 = 10.;
+  L0 = 10. [1];
   X0 = -L0/2.;
   G = 9.81;
   N = 64;
-  nu = sqrt(s*G/Re);
-  du0 = sqrt(s*Re*G);
+  nu = sqrt(s*G*cube(h0)/Re);
+  du0 = sqrt(s*G*Re/h0);
   dut = duv;
 
   /**
@@ -81,11 +82,11 @@ We set the initial water level to 1 and set the surface stress. */
 event init (i = 0) {
   foreach() {
 #if !ML
-    h[] = 1.;
+    h[] = h0;
     duv[] = du0*(1. - pow(2.*x/L0,10));
 #else
     foreach_layer()
-      h[] = 1./nl;
+      h[] = h0/nl;
     duv.x[] = du0*(1. - pow(2.*x/L0,10));
 #endif
   }
@@ -97,7 +98,9 @@ solution. */
 
 #define uan(z)  (du0*(z)/4.*(3.*(z) - 2.))
 
-event error (t = 10./nu)
+double t0 = 10;
+
+event error (t = t0/nu)
 {
   int i = 0;
   foreach() {

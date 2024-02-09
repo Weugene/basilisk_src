@@ -40,7 +40,7 @@ int main() {
   G.y = 50.;
   rho1 = 1, rho2 = 0.1;
   mu1 = mu2 = 0.0182571749236;
-  TOLERANCE = 1e-6;
+  TOLERANCE = 1e-6[*];
 
   /**
   We vary the resolution to check for convergence. */

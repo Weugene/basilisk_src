@@ -152,28 +152,37 @@ void mpi_boundary_refine  (scalar *);
 void mpi_boundary_coarsen (int, int);
 void mpi_boundary_update  (scalar *);
 
+static
+scalar * list_add_depend (scalar * list, scalar s)
+{
+  if (is_constant(s) || s.restriction == no_restriction)
+    return list;
+  for (scalar t in list)
+    if (t.i == s.i)
+      return list;
+  for (scalar d in s.depends)
+    list = list_add_depend (list, d);
+  return list_append (list, s);
+}
+
 typedef struct {
   int nc, nf;
 } astats;
 
-struct Adapt {
-  scalar * slist; // list of scalars
-  double * max;   // tolerance for each scalar
-  int maxlevel;   // maximum level of refinement
-  int minlevel;   // minimum level of refinement (default 1)
-  scalar * list;  // list of fields to update (default all)
-};
-
 trace
-astats adapt_wavelet (struct Adapt p)
+astats adapt_wavelet (scalar * slist,       // list of scalars
+		      double * max,         // tolerance for each scalar
+		      int maxlevel,         // maximum level of refinement
+		      int minlevel = 1,     // minimum level of refinement
+		      scalar * list = all)  // list of fields to update
 {
-  scalar * list = p.list;
+  scalar * ilist = list;
   
   if (is_constant(cm)) {
     if (list == NULL || list == all)
       list = list_copy (all);
     boundary (list);
-    restriction (p.slist);
+    restriction (slist);
   }
   else {
     if (list == NULL || list == all) {
@@ -182,7 +191,7 @@ astats adapt_wavelet (struct Adapt p)
 	list = list_add (list, s);
     }
     boundary (list);
-    scalar * listr = list_concat (p.slist, {cm});
+    scalar * listr = list_concat (slist, {cm});
     restriction (listr);
     free (listr);
   }
@@ -190,12 +199,11 @@ astats adapt_wavelet (struct Adapt p)
   astats st = {0, 0};
   scalar * listc = NULL;
   for (scalar s in list)
-    if (!is_constant(s) && s.restriction != no_restriction)
-      listc = list_add (listc, s);
+    listc = list_add_depend (listc, s);
 
   // refinement
-  if (p.minlevel < 1)
-    p.minlevel = 1;
+  if (minlevel < 1)
+    minlevel = 1;
   tree->refined.n = 0;
   static const int refined = 1 << user, too_fine = 1 << (user + 1);
   foreach_cell() {
@@ -225,8 +233,8 @@ astats adapt_wavelet (struct Adapt p)
 	if (local) {
 	  int i = 0;
 	  static const int just_fine = 1 << (user + 3);
-	  for (scalar s in p.slist) {
-	    double max = p.max[i++], sc[1 << dimension];
+	  for (scalar s in slist) {
+	    double emax = max[i++], sc[1 << dimension];
 	    int c = 0;
 	    foreach_child()
 	      sc[c++] = s[];
@@ -234,13 +242,13 @@ astats adapt_wavelet (struct Adapt p)
 	    c = 0;
 	    foreach_child() {
 	      double e = fabs(sc[c] - s[]);
-	      if (e > max && level < p.maxlevel) {
+	      if (e > emax && level < maxlevel) {
 		cell.flags &= ~too_fine;
 		cell.flags |= too_coarse;
 	      }
-	      else if ((e <= max/1.5 || level > p.maxlevel) &&
+	      else if ((e <= emax/1.5 || level > maxlevel) &&
 		       !(cell.flags & (too_coarse|just_fine))) {
-		if (level >= p.minlevel)
+		if (level >= minlevel)
 		  cell.flags |= too_fine;
 	      }
 	      else if (!(cell.flags & too_coarse)) {
@@ -254,7 +262,7 @@ astats adapt_wavelet (struct Adapt p)
 	    cell.flags &= ~just_fine;
 	    if (!is_leaf(cell)) {
 	      cell.flags &= ~too_coarse;
-	      if (level >= p.maxlevel)
+	      if (level >= maxlevel)
 		cell.flags |= too_fine;
 	    }
 	    else if (!is_active(cell))
@@ -302,7 +310,7 @@ astats adapt_wavelet (struct Adapt p)
   if (st.nc || st.nf)
     mpi_boundary_update (list);
 
-  if (list != p.list)
+  if (list != ilist)
     free (list);
   
   return st;

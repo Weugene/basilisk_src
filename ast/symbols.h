@@ -97,8 +97,8 @@ enum yysymbol_kind_t
   sym_90_ = 90,                       /* '{'  */
   sym_91_ = 91,                       /* '['  */
   sym_92_ = 92,                       /* ']'  */
-  sym_93_ = 93,                       /* '&'  */
-  sym_94_ = 94,                       /* '*'  */
+  sym_93_ = 93,                       /* '*'  */
+  sym_94_ = 94,                       /* '&'  */
   sym_95_ = 95,                       /* '+'  */
   sym_96_ = 96,                       /* '-'  */
   sym_97_ = 97,                       /* '~'  */
@@ -222,5 +222,6 @@ enum yysymbol_kind_t
   sym_boundary_definition = 215,      /* boundary_definition  */
   sym_external_foreach_dimension = 216, /* external_foreach_dimension  */
   sym_attribute = 217,                /* attribute  */
-  sym_root = 218                      /* root  */
+  sym_new_field = 218,                /* new_field  */
+  sym_root = 219                      /* root  */
 };

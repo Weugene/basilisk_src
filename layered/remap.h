@@ -80,8 +80,10 @@ void vertical_remapping (scalar h, scalar * tracers)
       foreach_layer() {
 	zpos[point.l+1] = zpos[point.l] + max(h[],dry);
 	int i = nvar*point.l;
-	for (scalar s in tracers)
+	for (scalar s in tracers) {
+	  dimensional (fnew[i] = s[]);
 	  fdat[i++] = s[];
+	}
 #if HALF
 	if (point.l < nl/2)
 	  h[] = 2.*H0*beta[point.l];

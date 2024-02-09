@@ -13,8 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 
--include ../config
-
 AR        = ar
 INCLUDE   = $(CURDIR)/include
 SRC       = $(CURDIR)/src
@@ -81,3 +79,5 @@ clean:
 	@rm -f $(SRC)/sha1/*.o
 	@rm -f $(SRC)/*.o
 	@rm -f $(LIB)
+
+check:

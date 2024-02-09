@@ -1,5 +1,5 @@
 #include <stdarg.h>
-#include <kdt/kdt.h>
+#include "kdt/kdt.h"
 #pragma autolink -L$BASILISK/kdt -lkdt
 
 @if _OPENMP

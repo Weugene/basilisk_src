@@ -12,8 +12,14 @@ int read_identifier (char * buf)
   if (c == '{')
     while ((c = getchar()) != EOF && c != '}');
   if (c == '/') {
-    while (((c = getchar()) != EOF && c != '*') ||
-	   ((c = getchar()) != EOF && c != '/'));
+    c = getchar();
+    if (c == '*')
+      while (((c = getchar()) != EOF && c != '*') ||
+	     ((c = getchar()) != EOF && c != '/'));
+    else {
+      assert (c == '/');
+      while ((c = getchar()) != EOF && c != '\n');
+    }
   }
   if (c == '\'') {
     *buf++ = c;

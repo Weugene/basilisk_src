@@ -181,7 +181,7 @@ double nu_H = 1000.; // 1e-2;
 
 int main()
 {
-  size (256e3);
+  size (256e3 [1]);
   N = 256;
 
   /**
@@ -196,7 +196,7 @@ int main()
   nu = 1e-4;
 #endif
   G = 9.81;
-  DT = 15.; // Ilicak et al, 2012 use 10 sec
+  DT = 15. [0,1]; // Ilicak et al, 2012 use 10 sec
 
   /**
   Vertical remapping uses a monotonic limiter to avoid creating new
@@ -243,7 +243,7 @@ event viscous_term (i++)
 {
   // Quadratic bottom friction,
   // see also: gerris-snapshot/doc/figures/diffusion.tm
-  double Cf = 1e-2;
+  double Cf = 1e-2; // fixme: this has the dimensions of a length...
   lambda_b = lambda_q;
   foreach() {
     double au = norm(u);

@@ -21,10 +21,10 @@ droplets. We generate animations online using Basilisk View. */
 We define the radius of the jet, the initial jet length, the Reynolds
 number and the surface tension coefficient. */
 
-#define radius 1./12.
-#define length 0.025
-#define Re 5800
-#define SIGMA 3e-5
+double radius = 1./12.;
+double length = 0.025;
+double Re = 5800;
+double SIGMA = 3e-5;
 
 /**
 The default maximum level of refinement is 10 and the error threshold
@@ -39,8 +39,9 @@ fraction field *f0* which is one inside the cylinder and zero
 outside. We then set an oscillating inflow velocity on the
 left-hand-side and free outflow on the right-hand-side. */
 
+double u0 = 1., au = 0.05, T0 = 0.1;
 scalar f0[];
-u.n[left]  = dirichlet(f0[]*(1. + 0.05*sin (10.*2.*pi*t)));
+u.n[left]  = dirichlet(f0[]*(u0 + au*sin (2.*pi*t/T0)));
 u.t[left]  = dirichlet(0);
 #if dimension > 2
 u.r[left]  = dirichlet(0);
@@ -68,14 +69,14 @@ int main (int argc, char * argv[])
   
   init_grid (64);
   origin (0, -1.5, -1.5);
-  size (3.);
+  size (3. [1]);
 
   /**
   We set the density and viscosity of each phase as well as the
   surface tension coefficient and start the simulation. */
   
-  rho1 = 1., rho2 = 1./27.84;
-  mu1 = 2.*radius/Re*rho1, mu2 = 2.*radius/Re*rho2;  
+  rho1 = 1. [0], rho2 = rho1/27.84;
+  mu1 = 2.*u0*radius/Re*rho1, mu2 = 2.*u0*radius/Re*rho2;
   f.sigma = SIGMA;
 
   run();
@@ -106,7 +107,7 @@ event init (t = 0) {
 
     foreach() {
       f[] = f0[]*(x < length);
-      u.x[] = f[];
+      u.x[] = u0*f[];
     }
   }
 }
@@ -270,8 +271,8 @@ module load openmpi
 module load intel
 
 NAME=atomisation
-mpicc -Wall -std=c99 -O2 _$NAME.c -o $NAME \
-      -L$HOME/gl -lglutils -lfb_osmesa -lOSMesa -lGLU -lm
+mpicc -Wall -std=c99 -D_XOPEN_SOURCE=700 -O2 _$NAME.c -o $NAME \
+      -L$HOME/gl -lglutils -lfb_tiny -lm
 srun --mpi=pmi2 -K1 --resv-ports -n $SLURM_NTASKS ./$NAME $LEVEL \
      2> log-$LEVEL-$SLURM_NTASKS > out-$LEVEL-$SLURM_NTASKS
 ~~~
@@ -306,8 +307,8 @@ with the following `run.sh` script
 #PBS -j oe  
 # load modules 
 module load mpt
-mpicc -Wall -O2 -std=c99 _atomisation.c -o atomisation \
-     -L$HOME/gl -lglutils -lfb_osmesa -lOSMesa -lGLU -lm
+mpicc -Wall -O2 -std=c99 -D_XOPEN_SOURCE=700 _atomisation.c -o atomisation \
+        -L$HOME/gl -lglutils -lfb_tiny -lm
 # change to the directory where program job_script_file is located 
 cd $PBS_O_WORKDIR 
 # mpirun -np 672 !!!! does not work !!!!

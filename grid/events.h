@@ -1,9 +1,10 @@
 #define INIT ev->expr[0]
 #define COND ev->expr[1]
 #define INC  ev->expr[2]
-#define END_EVENT 1234567890
 
-#define TEPS 1e-9
+static int END_EVENT = 1234567890;
+static double TEND_EVENT = 1234567890;
+static double TEPS = 1e-9;
 
 static void event_error (Event * ev, const char * s)
 {
@@ -14,7 +15,7 @@ static void event_error (Event * ev, const char * s)
 static void init_event (Event * ev)
 {
   if (ev->arrayi || ev->arrayt) {
-    ev->i = ev->t = -1;
+    ev->i = -1; ev->t = - TEND_EVENT;
     if (ev->arrayi)
       ev->i = ev->arrayi[0];
     else 
@@ -26,9 +27,9 @@ static void init_event (Event * ev)
     if (ev->nexpr > 0) {
       Expr init = NULL, cond = NULL, inc = NULL;
       for (int j = 0; j < ev->nexpr; j++) {
-	int i = -123456; double t = i;
+	int i = -123456; double t = - TEND_EVENT;
 	(* ev->expr[j]) (&i, &t, ev);
-	if (i == -123456 && t == -123456) {
+	if (i == -123456 && t == - TEND_EVENT) {
 	  /* nothing done to i and t: this must be the condition */
 	  if (cond)
 	    event_error (ev, "events can only use a single condition");
@@ -58,18 +59,18 @@ static void init_event (Event * ev)
       INC  = inc;
       ev->nexpr = 0;
     }
-    ev->i = ev->t = -1;
+    ev->i = -1; ev->t = - TEND_EVENT;
     if (INIT) {
       (* INIT) (&ev->i, &ev->t, ev);
-      if (ev->i == END_EVENT || ev->t == END_EVENT) {
-	ev->i = END_EVENT; ev->t = -1;
+      if (ev->i == END_EVENT || ev->t == TEND_EVENT) {
+	ev->i = END_EVENT; ev->t = - TEND_EVENT;
       }
     }
     else if (INC) {
       (* INC) (&ev->i, &ev->t, ev);
       if (ev->i != -1)
 	ev->i = 0;
-      if (ev->t != -1)
+      if (ev->t != - TEND_EVENT)
 	ev->t = 0;
     }
   }
@@ -79,7 +80,7 @@ enum { event_done, event_alive, event_stop };
 
 static int event_finished (Event * ev)
 {
-  ev->t = ev->i = -1;
+  ev->i = -1; ev->t = - TEND_EVENT;
   return event_done;
 }
 
@@ -128,11 +129,17 @@ static void event_print (Event * ev, FILE * fp)
 }
 #endif
 
+/**
+The interpreter [overloads](/ast/interpreter/overload.h) the function
+below to control (i.e. shorten) the events loop. */
+
+static bool overload_event() { return true; }
+
 static int event_do (Event * ev, bool action)
 {
   if ((iter > ev->i && t > ev->t) || !event_cond (ev, iter, t))
     return event_finished (ev);
-  if (iter == ev->i || fabs (t - ev->t) <= TEPS) {
+  if (!overload_event() || iter == ev->i || fabs (t - ev->t) <= TEPS*t) {
     if (action) {
       bool finished = false;
       for (Event * e = ev; e; e = e->next) {
@@ -218,7 +225,7 @@ int events (bool action)
     if (ev->i > iter && ev->i < inext)
       inext = ev->i;
   }
-  if ((!cond || cond1) && (tnext != HUGE || inext != END_EVENT)) {
+  if (overload_event() && (!cond || cond1) && (tnext != HUGE || inext != END_EVENT)) {
     inext = iter + 1;
     return 1;
   }
@@ -247,7 +254,7 @@ double dtnext (double dt)
       dt = tnext - t;
     else {
       double dt1 = (tnext - t)/n;
-      if (dt1 > dt + TEPS)
+      if (dt1 > dt*(1. + TEPS))
 	dt = (tnext - t)/(n + 1);
       else if (dt1 < dt)
 	dt = dt1;

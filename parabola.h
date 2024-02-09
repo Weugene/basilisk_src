@@ -164,7 +164,7 @@ static double parabola_fit_curvature (ParabolaFit * p,
 {
   double kappa;
 #if dimension == 2
-  double dnm = 1. + sq(p->a[1]);
+  double dnm = 1.[0] + sq(p->a[1]);
   kappa = - 2.*p->a[0]/pow(dnm, 3/2.);
   if (kmax)
     *kmax = fabs (kappa);

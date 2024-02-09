@@ -49,16 +49,16 @@ esac
 
 script()
 {
-    rm -f $src
+    rm -f $src display.html
     if test -f fail; then
 	return 1
     fi
-    cat warn
     test -s warn || rm -f warn
 
     pass=true
     rm -f log-* stencil stencil-* fine fine-* coarse coarse-*
-   if test -n "$EXEC" -o -z "$GDB"; then
+    tail -f --pid=$$ --retry display.html 2> /dev/null | grep -o 'http://.*:[0-9]*' &
+    if test -n "$EXEC" -o -z "$GDB"; then
 	if ! $EXEC ./$test 2> $log > $out; then
 	    pass=false
 	    if test "$EXEC" = " " -a -f core -a -n "$GDB"; then
@@ -67,10 +67,10 @@ script()
 		$GDB -q ./$test core
 	    fi
 	fi
-   else
+    else
 	if ! $GDB -batch -return-child-result -ex "run 2> $log > $out" ./$test > gdb.log 2> gdb.err; then
 	    pass=false
-	    awk '
+	    $AWK '
      {
        if (NF > 0)
          a[nb++] = $0;
@@ -113,8 +113,8 @@ script()
 locally()
 {
     echo \[$test.$ext\]
-    $BASILISK/qcc -autolink $CFLAGS -o $test/$test $src $LIBS -lm > $test/warn 2>&1 \
-	|| mv -f $test/warn $test/fail
+    $BASILISK/qcc -autolink -disable-dimensions $CFLAGS -o $test/$test $src $LIBS -lm > $test/log 2>&1 \
+	|| mv -f $test/log $test/fail
     cd $test
     script
     cd ..
@@ -179,7 +179,7 @@ doplots()
 remotely()
 {
     rhost=$1
-    autolink=`$BASILISK/qcc -autolink -progress -source $CFLAGS $src`
+    autolink=`$BASILISK/qcc -autolink -progress -source -disable-dimensions $CFLAGS $src`
     chksum=`(cat $test.s && pwd && echo $test) | $GENSUM | cut -d' ' -f1`.$ext
     mkdir $test/$chksum
     cd $test
@@ -201,7 +201,7 @@ remotely()
     case "$CFLAGS" in
 	*-cadna*) PCC="\$CADNACC" ;;
     esac
-    PCFLAGS=`echo $CFLAGS | sed -e 's/-grid=[^-]*//' -e 's/-cadna//' -e 's/-progress//'`
+    PCFLAGS=`echo $CFLAGS | sed -e 's/-grid=[^-]*//g' -e 's/-cadna//g' -e 's/-progress//g' -e 's/-Wdimensions//g'`
     NCORES=`echo $EXEC | awk 'BEGIN{ np = 1 }{
       if ($1 == "mpirun") np = $3; }END{ print np;}'`
     case "$CFLAGS" in
@@ -227,11 +227,9 @@ run_untrusted()
   return \$status
 }
 
-$PCC $PCFLAGS -I\$HOME/include -o $chksum $src -L\$HOME/lib $LIBS $autolink -lm > warn 2>&1 || mv -f warn fail
+$PCC $PCFLAGS -I\$HOME/include -o $chksum $src -L\$HOME/lib $LIBS $autolink -lm > log 2>&1 || mv -f log fail
 rm -f $src
 if ! test -f fail; then
-  test -s warn || rm -f warn
-
   pass=true
   if test -n "$EXEC" -o -z "`which gdb`"; then
     if ! run_untrusted "$TIMEOUT $EXEC ./$chksum 2> $log > $out"; then
@@ -479,8 +477,8 @@ if test -f $test.$ext && checksum $test.s $test.$ext; then
     if $source_modified; then
 	if test -n "$SANDBOX"; then
 	    rm -f $test/warn
-	    gawk -f $BASILISK/gnuplot.awk < $src > $test/plots
-	    gawk -f $BASILISK/python.awk < $src > $test/plots.py
+	    $AWK -f $BASILISK/gnuplot.awk < $src > $test/plots
+	    $AWK -f $BASILISK/python.awk < $src > $test/plots.py
 	    chksum=`(cat $test.s && pwd && echo $test) | $GENSUM | cut -d' ' -f1`.$ext
 	    cd $test
 	    doplots "$test"
@@ -503,8 +501,8 @@ elif ! test -f $test/fail.$ext || ! test -f $test/fail || ! checksum $test.s $te
     $GENSUM $src $test.s > $test.$ext
 
     mkdir -p $test && cp -f $src $test
-    gawk -f $BASILISK/gnuplot.awk < $src > $test/plots
-    gawk -f $BASILISK/python.awk < $src > $test/plots.py
+    $AWK -f $BASILISK/gnuplot.awk < $src > $test/plots
+    $AWK -f $BASILISK/python.awk < $src > $test/plots.py
     cp -f $test.* $test 2> /dev/null || true
     run=`echo $test | sed 's/^~//'`
     if test "$run" != "$test"; then

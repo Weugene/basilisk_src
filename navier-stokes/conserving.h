@@ -16,7 +16,7 @@ static void momentum_refine (Point point, scalar u) {
   double rhou = 0.;
   foreach_child()
     rhou += cm[]*rho(f[])*u[];
-  double du = u[] - rhou/((1 << dimension)*cm[]*rho(f[]));
+  double du = u[] - rhou/((1 << dimension)*(cm[] + SEPS)*rho(f[]));
   foreach_child()
     u[] += du;
 }
@@ -26,7 +26,7 @@ static void momentum_restriction (Point point, scalar u)
   double rhou = 0.;
   foreach_child()
     rhou += cm[]*rho(f[])*u[];
-  u[] = rhou/((1 << dimension)*cm[]*rho(f[]));
+  u[] = rhou/((1 << dimension)*(cm[] + SEPS)*rho(f[]));
 }
 #endif // TREE
 

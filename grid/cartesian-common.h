@@ -54,7 +54,7 @@ static void init_block_scalar (scalar sb, const char * name, const char * ext,
 {
   char bname[strlen(name) + strlen(ext) + 10];
   if (n == 0) {
-    sprintf (bname, "%s%s", name, ext);
+    strcat (strcpy (bname, name), ext);
     sb.block = block;
     init_scalar (sb, bname);
     baseblock = list_append (baseblock, sb);
@@ -67,8 +67,11 @@ static void init_block_scalar (scalar sb, const char * name, const char * ext,
   all = list_append (all, sb);
 }
 
+@define interpreter_set_int(...)
+
 scalar new_block_scalar (const char * name, const char * ext, int block)
 {
+  interpreter_set_int (&block);
   int nvar = datasize/sizeof(double);
 
   scalar s = {0};
@@ -80,7 +83,7 @@ scalar new_block_scalar (const char * name, const char * ext, int block)
     if (n >= block) { // found n free slots
       for (sb.i = s.i, n = 0; n < block; n++, sb.i++)
 	init_block_scalar (sb, name, ext, n, block);
-      trash (((scalar []){s, {-1}}));
+      trash (((scalar []){s, {-1}})); // fixme: only trashes one block?
       return s;
     }
     s.i = sb.i + 1;
@@ -91,13 +94,13 @@ scalar new_block_scalar (const char * name, const char * ext, int block)
   assert (nvar + block <= _NVARMAX);
   qrealloc (_attribute, nvar + block, _Attributes);
   memset (&_attribute[nvar], 0, block*sizeof (_Attributes));
+  // allocate extra space on the grid
+  realloc_scalar (block*sizeof(double));
+  trash (((scalar []){s, {-1}})); // fixme: only trashes one block?
   for (int n = 0; n < block; n++, nvar++) {
     scalar sb = (scalar){nvar};
     init_block_scalar (sb, name, ext, n, block);
   }
-  // allocate extra space on the grid
-  realloc_scalar (block*sizeof(double));
-  trash (((scalar []){s, {-1}}));
   return s;
 }
 
@@ -181,10 +184,10 @@ vector new_block_face_vector (const char * name, int block)
 tensor new_tensor (const char * name)
 {
   char cname[strlen(name) + 3];
-  struct { char * x, * y, * z; } ext = {"%s.x", "%s.y", "%s.z"};
+  struct { char * x, * y, * z; } ext = {".x", ".y", ".z"};
   tensor t;
   foreach_dimension() {
-    sprintf (cname, ext.x, name);
+    strcat (strcpy (cname, name), ext.x);
     t.x = new_vector (cname);
   }
   init_tensor (t, NULL);
@@ -194,22 +197,22 @@ tensor new_tensor (const char * name)
 tensor new_symmetric_tensor (const char * name)
 {
   char cname[strlen(name) + 5];
-  struct { char * x, * y, * z; } ext = {"%s.x.x", "%s.y.y", "%s.z.z"};
+  struct { char * x, * y, * z; } ext = {".x.x", ".y.y", ".z.z"};
   tensor t;
   foreach_dimension() {
-    sprintf (cname, ext.x, name);
+    strcat (strcpy (cname, name), ext.x);
     t.x.x = new_scalar(cname);
   }
   #if dimension > 1
-    sprintf (cname, "%s.x.y", name);
+    strcat (strcpy (cname, name), "x.y");
     t.x.y = new_scalar(cname);
     t.y.x = t.x.y;
   #endif
   #if dimension > 2
-    sprintf (cname, "%s.x.z", name);
+    strcat (strcpy (cname, name), "x.z");
     t.x.z = new_scalar(cname);
     t.z.x = t.x.z;
-    sprintf (cname, "%s.y.z", name);
+    strcat (strcpy (cname, name), "y.z");
     t.y.z = new_scalar(cname);
     t.z.y = t.y.z;
   #endif
@@ -531,7 +534,7 @@ vector cartesian_init_vector (vector v, const char * name)
   foreach_dimension() {
     if (name) {
       char cname[strlen(name) + 3];
-      sprintf (cname, "%s%s", name, ext.x);
+      strcat (strcpy (cname, name), ext.x);
       init_scalar (v.x, cname);
     }
     else
@@ -563,7 +566,7 @@ tensor cartesian_init_tensor (tensor t, const char * name)
   foreach_dimension() {
     if (name) {
       char cname[strlen(name) + 3];
-      sprintf (cname, "%s%s", name, ext.x);
+      strcat (strcpy (cname, name), ext.x);
       init_vector (t.x, cname);
     }
     else
@@ -589,28 +592,21 @@ tensor cartesian_init_tensor (tensor t, const char * name)
   return t;
 }
 
-struct OutputCells {
-  FILE * fp;
-  coord c;
-  double size;
-};
-
-void output_cells (struct OutputCells p)
+void output_cells (FILE * fp = stdout, coord c = {0}, double size = 0.)
 {
-  if (!p.fp) p.fp = stdout;
   foreach() {
     bool inside = true;
     coord o = {x,y,z};
     foreach_dimension()
-      if (inside && p.size > 0. &&
-	  (o.x > p.c.x + p.size || o.x < p.c.x - p.size))
+      if (inside && size > 0. &&
+	  (o.x > c.x + size || o.x < c.x - size))
 	inside = false;
     if (inside) {
       Delta /= 2.;
 #if dimension == 1
-      fprintf (p.fp, "%g 0\n%g 0\n\n", x - Delta, x + Delta);
+      fprintf (fp, "%g 0\n%g 0\n\n", x - Delta, x + Delta);
 #elif dimension == 2
-      fprintf (p.fp, "%g %g\n%g %g\n%g %g\n%g %g\n%g %g\n\n",
+      fprintf (fp, "%g %g\n%g %g\n%g %g\n%g %g\n%g %g\n\n",
 	       x - Delta, y - Delta,
 	       x - Delta, y + Delta,
 	       x + Delta, y + Delta,
@@ -618,21 +614,21 @@ void output_cells (struct OutputCells p)
 	       x - Delta, y - Delta);
 #else // dimension == 3
       for (int i = -1; i <= 1; i += 2) {
-	fprintf (p.fp, "%g %g %g\n%g %g %g\n%g %g %g\n%g %g %g\n%g %g %g\n\n",
+	fprintf (fp, "%g %g %g\n%g %g %g\n%g %g %g\n%g %g %g\n%g %g %g\n\n",
 		 x - Delta, y - Delta, z + i*Delta,
 		 x - Delta, y + Delta, z + i*Delta,
 		 x + Delta, y + Delta, z + i*Delta,
 		 x + Delta, y - Delta, z + i*Delta,
 		 x - Delta, y - Delta, z + i*Delta);
 	for (int j = -1; j <= 1; j += 2)
-	  fprintf (p.fp, "%g %g %g\n%g %g %g\n\n",
+	  fprintf (fp, "%g %g %g\n%g %g %g\n\n",
 		   x + i*Delta, y + j*Delta, z - Delta,
 		   x + i*Delta, y + j*Delta, z + Delta);
       }
 #endif
     }
   }
-  fflush (p.fp);
+  fflush (fp);
 }
 
 #if TREE && _MPI
@@ -778,33 +774,28 @@ tensor init_symmetric_tensor (tensor t, const char * name)
 {
   return init_tensor (t, name);
 }
-  
-struct _interpolate {
-  scalar v;
-  double x, y, z;
-};
 
-static double interpolate_linear (Point point, struct _interpolate p)
+static double interpolate_linear (Point point, scalar v,
+				  double xp = 0., double yp = 0., double zp = 0.)
 {
-  scalar v = p.v;
 #if dimension == 1
-  x = (p.x - x)/Delta - v.d.x/2.;
+  x = (xp - x)/Delta - v.d.x/2.;
   int i = sign(x);
   x = fabs(x);
   /* linear interpolation */
   return v[]*(1. - x) + v[i]*x;
 #elif dimension == 2
-  x = (p.x - x)/Delta - v.d.x/2.;
-  y = (p.y - y)/Delta - v.d.y/2.;
+  x = (xp - x)/Delta - v.d.x/2.;
+  y = (yp - y)/Delta - v.d.y/2.;
   int i = sign(x), j = sign(y);
   x = fabs(x); y = fabs(y);
   /* bilinear interpolation */
   return ((v[]*(1. - x) + v[i]*x)*(1. - y) + 
 	  (v[0,j]*(1. - x) + v[i,j]*x)*y);
 #else // dimension == 3
-  x = (p.x - x)/Delta - v.d.x/2.;
-  y = (p.y - y)/Delta - v.d.y/2.;
-  z = (p.z - z)/Delta - v.d.z/2.;
+  x = (xp - x)/Delta - v.d.x/2.;
+  y = (yp - y)/Delta - v.d.y/2.;
+  z = (zp - z)/Delta - v.d.z/2.;
   int i = sign(x), j = sign(y), k = sign(z);
   x = fabs(x); y = fabs(y); z = fabs(z);
   /* trilinear interpolation */
@@ -816,18 +807,18 @@ static double interpolate_linear (Point point, struct _interpolate p)
 }
 
 trace
-double interpolate (struct _interpolate p)
+double interpolate (scalar v, double xp = 0., double yp = 0., double zp = 0.)
 {
-  scalar v = p.v;
   boundary ({v});
-  Point point = locate (p.x, p.y, p.z);
+  Point point = locate (xp, yp, zp);
   if (point.level < 0)
     return nodata;
-  return interpolate_linear (point, p);
+  return interpolate_linear (point, v, xp, yp, zp);
 }
 
 trace
-void interpolate_array (scalar * list, coord * a, int n, double * v, bool linear)
+void interpolate_array (scalar * list, coord * a, int n, double * v,
+			bool linear = false)
 {
   boundary (list);
   int j = 0;
@@ -836,8 +827,7 @@ void interpolate_array (scalar * list, coord * a, int n, double * v, bool linear
     if (point.level >= 0) {
       for (scalar s in list)
 	v[j++] = !linear ? s[] :
-	  interpolate_linear (point,
-			      (struct _interpolate){s, a[i].x, a[i].y, a[i].z});
+	  interpolate_linear (point, s, a[i].x, a[i].y, a[i].z);
     }
     else
       for (scalar s in list)
@@ -891,7 +881,10 @@ static void periodic_boundary (int d)
 {
   /* We change the conditions for existing scalars. */
   for (scalar s in all)
-    s.boundary[d] = s.boundary_homogeneous[d] = periodic_bc;
+    if (is_vertex_scalar (s))
+      s.boundary[d] = s.boundary_homogeneous[d] = NULL;
+    else
+      s.boundary[d] = s.boundary_homogeneous[d] = periodic_bc;
   /* Normal components of face vector fields should remain NULL. */
   for (scalar s in all)
     if (s.face) {
@@ -999,3 +992,12 @@ void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
     s.input = true;
   s.output = true;
 }
+
+/**
+Macros overloaded by the interpreter. */
+
+@define dimensional(...)
+#define show_dimension(...) show_dimension_internal (__VA_ARGS__ + 10293847566574839201.)
+@define show_dimension_internal(...)
+@define display_value(...)
+@define interpreter_verbosity(...)

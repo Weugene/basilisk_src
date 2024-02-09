@@ -24,6 +24,13 @@ $\mathbf{n}$ and either $\alpha$ or $c$ i.e. there is a unique
 function which computes $\alpha$ given $c$ and $\mathbf{n}$. We call
 this function `line_alpha()` and define it as: */
 
+#if dimension == 1
+double line_alpha (double c, coord n)
+{
+  return clamp (c, 0., 1.) - 0.5;
+}
+#endif // dimension == 1
+
 #if dimension >= 2
 double line_alpha (double c, coord n)
 {
@@ -129,6 +136,29 @@ Conversely there is a unique function computing $c$ as a function of
 $\mathbf{n}$ and $\alpha$. We call this function `line_area()` and
 define it as: */
 
+#if dimension == 1
+double line_area (double nx, double alpha)
+{
+  double area;
+
+  alpha += nx/2.;
+  if (nx < 0.) {
+    alpha -= nx;
+    nx = -nx;
+  }
+
+  if (alpha <= 0.)
+    return 0.;
+
+  if (alpha >= nx)
+    return 1.;
+
+  area = alpha/nx;
+  return clamp (area, 0., 1.);
+}
+#define plane_volume(n, alpha) line_area(n.x, alpha)
+#endif // dimension == 1
+
 #if dimension >= 2
 double line_area (double nx, double ny, double alpha)
 {
@@ -221,7 +251,7 @@ double plane_volume (coord n, double alpha)
   double volume = al <= 0.5 ? tmp : 1. - tmp;
   return clamp (volume, 0., 1.);
 }
-#else // dimension < 3
+#elif dimension == 2
 # define plane_volume(n, alpha) line_area(n.x, n.y, alpha)
 #endif
 

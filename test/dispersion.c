@@ -217,6 +217,7 @@ int main()
 {
   periodic (right);
   size (2.*pi);
+  DT = HUGE [0]; // dimensionless time
   N = 128;
 #if ML
   CFL_H = 0.5;

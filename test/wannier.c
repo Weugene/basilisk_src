@@ -68,7 +68,13 @@ the 'bipolar' variant. */
 #define ECC (X2 - X1)
 
 int main() {
-  size (2.5);
+
+  /**
+  Space and time are dimensionless. */
+  
+  size (2.5[0]);
+  DT = HUGE[0];
+  
   origin (-L0/2., -L0/2.);
   
   stokes = true;

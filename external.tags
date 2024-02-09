@@ -36,5 +36,7 @@ call	mask			basilisk	complex-domains
 call	periodic		basilisk	periodic-boundaries
 call	reduction		basilisk	parallel-programming
 call	serial			basilisk	parallel-programming
+call	show_dimensions		basilisk	dimensional-analysis
+call	dimensional		basilisk	dimensional-analysis
 call	trace			basilisk	tracing-and-profiling
 call	vertex			basilisk	face-and-vertex-fields

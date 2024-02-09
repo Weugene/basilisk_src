@@ -30,11 +30,9 @@ gravity wave and $\lambda$ its wavelength. */
 
 double ak = 0.33;
 double RE = 40000.;
+double k_ = 2.*pi, h_ = 0.5, g_ = 1.;
 
-#define k_  (2.*pi)
-#define h_   0.5
-#define g_   1.
-#define T0  (k_/sqrt(g_*k_))
+#define T0  (k_*L0/sqrt(g_*k_))
 
 /**
 The domain is periodic in $x$ and resolved using 256$^2$
@@ -80,9 +78,10 @@ event init (i = 0)
   distribution. */
   
   geometric_beta (1./3., true);
-  
+
+  double a = 0.25;
   foreach() {
-    zb[] = - 0.5 + sin(pi*y)/4.;
+    zb[] = - 0.5 + a*sin(k_/2.*y);
     double H = wave(x, 0) - zb[];
     double z = zb[];
     foreach_layer() {
@@ -138,8 +137,9 @@ event movie (t += 8.*T0/(45*25))
   sprintf (s, "t = %.2f T0", t/T0);
   draw_string (s, size = 80);
   for (double x = -1; x <= 1; x++)
-    translate (x)
+    translate (x) {
       squares ("u29.x", linear = true, z = "eta", min = -0.15, max = 0.6);
+    }
   save ("movie.mp4");
 }
 
@@ -171,9 +171,9 @@ module load openmpi
 module load intel gcc
 
 NAME=breaking
-mpicc -Wall -std=c99 -O2 _$NAME.c -o $NAME \
-    -I/home/popinet/local -L/home/popinet/local/gl -L/home/popinet/local/lib \
-    -lglutils -lfb_osmesa -lOSMesa -lGLU -lppr -lgfortran -lm
+mpicc -Wall -std=c99 -D_XOPEN_SOURCE=700 -O2 _$NAME.c -o $NAME \
+    -L/home/popinet/local/gl -L/home/popinet/local/lib \
+    -lglutils -lfb_tiny -lppr -lgfortran -lm
 
 export LD_LIBRARY_PATH=/home/popinet/local/lib:$LD_LIBRARY_PATH
 export PATH=$PATH:/home/popinet/local/bin

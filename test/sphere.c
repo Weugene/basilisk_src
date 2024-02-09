@@ -11,6 +11,7 @@ double solution (double x, double y, double z)
 
 int main()
 {
+  size (1.[0]);
   origin (-0.5, -0.5, -0.5);
 
   int depth = 6;

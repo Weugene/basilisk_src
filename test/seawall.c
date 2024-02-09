@@ -34,7 +34,7 @@ int main()
   N = 1 << 11;
 #if ML
   breaking = 0.15;
-  TOLERANCE = 1e-4;
+  TOLERANCE = 1e-4 [*];
   CFL_H = 0.5;
 #endif
   run();

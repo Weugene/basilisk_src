@@ -31,7 +31,7 @@ We center the unit box on the origin and set a maximum timestep of 0.1 */
 int main()
 {
   origin (-0.5, -0.5);
-  DT = .1;
+  DT = .1[0,1];
   
   /**
   The scalar field `cf` is a "vof concentration" associated with phase
@@ -57,7 +57,7 @@ The period of the stretching cycle is set to 15, which will lead to
 strong stretching. Milder conditions can be obtained by decreasing it. */
 
 #define circle(x,y) (sq(0.2) - (sq(x + 0.2) + sq(y + .236338)))
-#define T 15.
+const double T = 15.;
 
 /**
 We define the levelset function $\phi$ on each vertex of the grid and
@@ -89,8 +89,9 @@ event velocity (i++) {
   on the vertices of the grid. */
 
   vertex scalar psi[];
+  double a = 1.5, k = pi;
   foreach_vertex()
-    psi[] = - 1.5*sin(2.*pi*t/T)*sin((x + 0.5)*pi)*sin((y + 0.5)*pi)/pi;
+    psi[] = - a*sin(2.*pi*t/T)*sin(k*(x + 0.5))*sin(k*(y + 0.5))/pi;
   
   /**
   We can then differentiate the streamfunction to get the velocity

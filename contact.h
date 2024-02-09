@@ -9,6 +9,8 @@ We first overload the default function used to compute the normal,
 defined in [fractions.h](). */
 
 coord interface_normal (Point point, scalar c);
+
+#undef interface_normal
 #define interface_normal(point, c) interface_normal (point, c)
 
 #include "fractions.h"

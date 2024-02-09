@@ -64,7 +64,8 @@ void solve (int depth)
     dp[right] = dirichlet(0);
     dp[left]  = dirichlet(0);
   }
-  
+
+  size (1. [0]); // space is dimensionless
   origin (-0.5, -0.5, -0.5);
   int nrelax = 4;
   init_grid(1);

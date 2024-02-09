@@ -47,8 +47,8 @@ function defaults()
 	    term = ""
 	}
 	else {
-	    if (match($0, "^[ \t]*set[ \t]+output[ \t]+(.*)", a)) {
-		output = a[1];
+	    if (match($0, "^[ \t]*set[ \t]+output[ \t]+")) {
+		output = substr($0, RLENGTH + 1);
 		if (term == "" && match (output, ".*\\.png"))
 		    printf ("set term @PNG enhanced font \",10\"; ");
 	    }

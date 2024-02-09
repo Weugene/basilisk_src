@@ -1,12 +1,30 @@
-CFLAGS += -Wall -O2 -g -I$(BASILISK) -DBASILISK=\"$(BASILISK)\"
+CFLAGS += -I.. -DBASILISK=\"$(subst /ast,,$(CURDIR))\"
 
-libast.a: ast.o tokens.o basilisk.o translate.o allocator.o \
-	stack.o stencil.o check.o
-	ar cr $@ $^
+OBJECTS = ast.o tokens.o basilisk.o translate.o allocator.o \
+	faststack.o stencil.o check.o interpreter/interpreter.o
 
-basilisk.c: basilisk.yacc
-	bison -Dparse.trace -d -o basilisk.c basilisk.yacc
-	sed -i 's/^ *YY_REDUCE_PRINT *(yyn);/ YY_REDUCE_PRINT (yyn); DEFAULT_ACTION (yyn);/' basilisk.c
+TOPTARGETS = all clean check
+
+SUBDIRS = interpreter
+
+.PHONY: subdirs $(SUBDIRS) $(TOPTARGETS)
+
+all: subdirs libast.a
+
+subdirs: $(SUBDIRS)
+
+$(TOPTARGETS): $(SUBDIRS)
+$(SUBDIRS):
+	$(MAKE) -C $@ $(filter-out $(SUBDIRS),$(MAKECMDGOALS))
+
+libast.a: $(OBJECTS)
+	ar cr $@ $(OBJECTS)
+
+# Uncomment the recipe below if you need to re-generate basilisk.c
+
+# basilisk.c: basilisk.yacc
+# 	bison -Dparse.trace -d -o basilisk.c basilisk.yacc
+# 	sed -i 's/^ *YY_REDUCE_PRINT *(yyn);/ YY_REDUCE_PRINT (yyn); DEFAULT_ACTION (yyn);/' basilisk.c
 
 symbols.h: basilisk.c Makefile
 	echo "// Automatically generated from basilisk.yacc" > symbols.h
@@ -19,16 +37,20 @@ grammar.h: basilisk.yacc grammar
 	./grammar < basilisk.yacc  > grammar.h
 
 grammar: grammar.c
-	cc -Wall grammar.c -o grammar
+	$(CC) $(CFLAGS) grammar.c -o grammar
 
-tokens.c: tokens.lex
-	flex -o tokens.c tokens.lex
+# Uncomment the recipe below if you need to re-generate tokens.c
+
+# tokens.c: tokens.lex
+#	flex -o tokens.c tokens.lex
 
 basilisk.o: ast.h parser.h
 
 ast.o: ast.h parser.h symbols.h
 
 stack.o: stack.h
+
+faststack.o: stack.h symbols.h ast.h
 
 tokens.o: ast.h basilisk.c
 
@@ -40,6 +62,8 @@ allocator.o: allocator.h
 
 check.o: ast.h symbols.h grammar.h
 
+expr.o: ast.h symbols.h
+
 clean:
 	rm -f *.o *.a
 
@@ -47,4 +71,5 @@ qcc: qcc.c libast.a
 	$(CC) $(CFLAGS) -o $@ $^
 
 expr: expr.c ast.h libast.a
-	$(CC) $(CFLAGS) -o $@ $< -L. -last
+	$(CC) $(CFLAGS) -o $@ $< -L. -last -lm
+

@@ -40,12 +40,11 @@ the [mg_solve()](poisson.h#mg_solve) and
 [mg_cycle()](poisson.h#mg_cycle) functions where more
 documentation can be found. */
 
-static struct MGSolve solve_init (struct MGSolve p) { return p; }
-
 #define solve(_a, _func, _rhs, ...)					\
   do {									\
     solve_stats = (mgstats){0};						\
-    struct MGSolve p = solve_init ({_a}, {_rhs}, __VA_ARGS__);		\
+    struct { int dummy, nrelax, minlevel; double tolerance; }		\
+      p = {0, __VA_ARGS__};						\
     scalar _res[], _da[];						\
     scalar_clone (_da, _a);						\
     for (int b = 0; b < nboundary; b++)					\

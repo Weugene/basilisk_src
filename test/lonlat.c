@@ -20,10 +20,13 @@ This test case was proposed by [Rossmanith et al,
 
 int main()
 {
+  
   /**
-  The domain is 150 degrees squared, centered on the origin. */
+  The radius of the sphere is unity, the domain is 150 degrees
+  squared, centered on the origin. */
 
-  L0 = 150.;
+  Radius = 1. [1];
+  L0 = 150. [0];
   X0 = Y0 = -L0/2.;
   N = 256;
   run();
@@ -40,8 +43,9 @@ event init (i = 0)
   the origin. */
 
   fraction (h, 0.2 - acos(cos(x*pi/180.)*cos(y*pi/180.)));
+  double a = 1.8;
   foreach()
-    h[] = 0.2 + 1.8*h[];
+    h[] = 0.2 + a*h[];
 }
 
 event masscheck (i++)
@@ -65,7 +69,7 @@ event profiles (t = 0.3; t += 0.3; t <= 0.9) {
 
   double xp[180], yp[180], np[180];
   for (int i = 0; i < 180; i++)
-    xp[i] = yp[i] = np[i] = 0.;
+    xp[i] = 0., yp[i] = 0., np[i] = 0.;
   
   foreach() {
     printf ("%g %g %g %g %g\n", x, y, u.x[], u.y[], h[]);

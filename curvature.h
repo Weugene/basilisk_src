@@ -42,6 +42,8 @@ static void curvature_prolongation (Point point, scalar kappa)
 }
 #endif // TREE
 
+#if dimension > 1
+
 /**
 ## Height-function curvature and normal
 
@@ -222,13 +224,13 @@ static double height_curvature (Point point, scalar c, vector h)
   if (kappa != nodata) {
     
     /**
-     We limit the maximum curvature to $1/\Delta$. */
-	
+    We limit the maximum curvature to $1/\Delta$. */
+
     if (fabs(kappa) > 1./Delta)
       kappa = sign(kappa)/Delta;
     
     /**
-     We add the axisymmetric curvature if necessary. */
+    We add the axisymmetric curvature if necessary. */
       
 #if AXI
     double nr, r = y, hx;
@@ -486,6 +488,8 @@ static double centroids_curvature_fit (Point point, scalar c)
   return kappa;
 }
 
+#endif // dimension > 1
+
 /**
 ## General curvature computation
 
@@ -522,10 +526,9 @@ interface defined by the volume fraction *c*. It uses a combination of
 the methods above: statistics on the number of curvatures computed
 which each method is returned in a *cstats* data structure. 
 
-If *sigma* is different from zero the curvature is multiplied by *sigma*.
+The curvature is multiplied by *sigma* (default is one).
 
-If *add* is *true*, the curvature (optionally multiplied by *sigma*)
-is added to field *kappa*. */
+If *add* is *true*, the curvature is added to field *kappa*. */
 
 typedef struct {
   int h; // number of standard HF curvatures
@@ -534,21 +537,11 @@ typedef struct {
   int c; // number of centroids fit curvatures
 } cstats;
 
-struct Curvature {
-  scalar c, kappa;
-  double sigma;
-  bool add;
-};
-
 trace
-cstats curvature (struct Curvature p)
+cstats curvature (scalar c, scalar kappa,
+		  double sigma = 1.[0], bool add = false)
 {
-  scalar c = p.c, kappa = p.kappa;
-  double sigma = p.sigma ? p.sigma : 1.;
   int sh = 0, sf = 0, sa = 0, sc = 0;
-  vector ch = c.height, h = automatic (ch);
-  if (!ch.x.i)
-    heights (c, h);
 
   /**
   On trees we set the prolongation and restriction functions for
@@ -558,6 +551,12 @@ cstats curvature (struct Curvature p)
   kappa.refine = kappa.prolongation = curvature_prolongation;
   kappa.restriction = curvature_restriction;
 #endif
+
+#if dimension > 1
+  
+  vector ch = c.height, h = automatic (ch);
+  if (!ch.x.i)
+    heights (c, h);
 
   /**
   We first compute a temporary curvature *k*: a "clone" of
@@ -620,14 +619,31 @@ cstats curvature (struct Curvature p)
     
     if (kf == nodata)
       kappa[] = nodata;
-    else if (p.add)
+    else if (add)
       kappa[] += sigma*kf;
     else
       kappa[] = sigma*kf;      
   }
+  
+#else // dimension == 1
+  foreach() {
+    if (!interfacial (point, c))
+      kappa[] = nodata;
+    else {
+      double r = x + sign(c[-1] - c[1])*(clamp(c[],0.,1.) - 0.5)*Delta;
+      double p = r > 0. ? - 2.*sigma/r : 0.;
+      if (add)
+	kappa[] += p;
+      else
+	kappa[] = p;
+    }
+  }
+#endif // dimension == 1
 
-  return (cstats){sh, sf, sa, sc};
+  return (cstats){sh, sf, sa, sc};   
 }
+
+#if dimension > 1
 
 /**
 # Position of an interface
@@ -705,6 +721,8 @@ static double height_position (Point point, scalar f, vector h,
   return pos;
 }
 
+#endif // dimension == 1
+
 /**
 The position() function fills field *pos* with
 $$
@@ -714,16 +732,9 @@ with $\mathbf{x}$ the position of the interface defined by $f$.
 
 If *add* is *true*, the position is added to *pos*. */
 
-struct Position {
-  scalar f, pos;
-  coord G, Z;
-  bool add;
-};
-
-void position (struct Position p)
+void position (scalar f, scalar pos,
+	       coord G = {0}, coord Z = {0}, bool add = false)
 {
-  scalar f = p.f, pos = p.pos;
-  coord * G = &p.G, * Z = &p.Z;
 
   /**
   On trees we set the prolongation and restriction functions for
@@ -734,12 +745,13 @@ void position (struct Position p)
   pos.restriction = curvature_restriction;
 #endif
 
+#if dimension > 1  
   vector fh = f.height, h = automatic (fh);
   if (!fh.x.i)
     heights (f, h);
   foreach() {
     if (interfacial (point, f)) {
-      double hp = height_position (point, f, h, G, Z);
+      double hp = height_position (point, f, h, &G, &Z);
       if (hp == nodata) {
 
 	/**
@@ -751,9 +763,9 @@ void position (struct Position p)
 	plane_area_center (n, alpha, &c);
 	hp = 0.;
 	foreach_dimension()
-	  hp += (o.x + Delta*c.x - Z->x)*G->x;
+	  hp += (o.x + Delta*c.x - Z.x)*G.x;
       }
-      if (p.add)
+      if (add)
 	pos[] += hp;
       else
 	pos[] = hp;
@@ -761,4 +773,18 @@ void position (struct Position p)
     else
       pos[] = nodata;
   }
+#else // dimension == 1
+  foreach() {
+    if (interfacial (point, f)) {
+      double hp = x + sign(f[-1] - f[1])*(clamp(f[],0.,1.) - 0.5)*Delta;
+      hp = (hp - Z.x)*G.x;
+      if (add)
+	pos[] += hp;
+      else
+	pos[] = hp;
+    }
+    else
+      pos[] = nodata;
+  }
+#endif // dimension == 1
 }

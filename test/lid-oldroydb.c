@@ -30,6 +30,7 @@ We assume that the solvent and polymer viscosities are equal ($\beta =
 
 int main()
 {
+  L0 = 1.[0];
   DT = DT_MAX;
   N = 64;
   init_grid (N);

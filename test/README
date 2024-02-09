@@ -93,6 +93,26 @@ Note that only the documented test cases appear in the list below
 * [Rising bubble](rising.c)
 * [Sessile drop](sessile.c)
 * [3D Sessile drop](sessile3D.c)
+* [Marangoni-induced translation due to a temperature gradient](marangoni.c)
+
+## Compressible two-phase flows
+
+* [Shock tube problem for a single ideal gas (strong shock wave)](shockwave.c)
+* [Advection of two fluids at different pressures](discontinuity-advection.c)
+* [Zero reflection of a wave propagating across an interface between two fluids
+   with impedance matching](reflectionperfect.c)
+* [Transmission/reflection of a wave propagating across an interface
+  between two fluids](reflectiongaussian3.c)
+* [Propagation of an acoustic disturbance in a tube](gaussianaxi.c)
+* [Small-amplitude oscillations due to surface tension](bubble.c)
+* [Small-amplitude spherically-symmetric oscillations due to surface tension](bubble-spherical.c)
+* [Rayleigh collapse of a compressible gas bubble](collapse.c)
+* [Double Mach reflection of a Mach 10 shock from a wall](inclined-shock.c)
+* [Shape oscillation of an inviscid droplet](oscillation.c)
+
+### Compressible two-phase flows with thermal effects
+
+* [Bubble shrinking due to thermal effects](shrinking.c)
 
 ## General orthogonal coordinates
 
@@ -107,6 +127,7 @@ Note that only the documented test cases appear in the list below
 
 * [Poisson equation on complex domains](neumann.c)
 * [Poisson equation on complex domains in 3D](neumann3D.c)
+* [Poisson equation on complex axisymmetric domains](neumann-axi.c)
 * [Stability of the embedded face velocity interpolation](uf.c)
 * [Hydrostatic balance with refined embedded boundaries](hydrostatic2.c)
 * [Hydrostatic balance with refined embedded boundaries in 3D](hydrostatic3.c)
@@ -184,7 +205,13 @@ Note that only the documented test cases appear in the list below
 * [Kuramoto--Sivashinsky equation](kuramoto.c)
 * [Convergence of the Runge--Kutta solvers](runge-kutta.c)
 * [Segment traversal](segment.c)
-* [CVMix KPP interface](cvmix.c)
+* [Redistancing of a perturbed distance field](redistance-ellipse.c)
+
+## Unmaintained
+
+The following tests are not maintained anymore.
+
+* [CVMix KPP interface](unmaintained/cvmix.c)
 
 ## [All tests](/src/test/)
 
@@ -322,8 +349,25 @@ where *-k* tells *make* not to stop at the first error and *-j8* uses
 parallel processing (assuming you have at least 8 cores on your
 system).
 
-If you want to generate all the graphs at once, do
+## Testing dimensional analysis
+
+[Dimensional analysis](/src/ast/interpreter/dimension.c) can be tested
+using reference files with a `.dims.ref` extension. The default
+Makefile will then compile the corresponding `.c` file using the
+`-dimensions` option to generate a `.dims` file which will be compared
+(using `diff`) to the reference file.
+
+A simple way to generate a new reference file for e.g. `test.c` is to do
 
 ~~~bash
-make plots
+touch test.dims.ref
+make test.s
+~~~
+
+The `make test.s` command will fail (since the reference file is empty)
+and one can then copy the generated `.dims` file as the new reference
+file (after checking that it is correct!) i.e.
+
+~~~bash
+cp test.dims test.dims.ref
 ~~~

@@ -129,7 +129,7 @@ event acceleration (i++)
   double C = - sq(theta_H*dt);
   foreach_face() {
     double ax = theta_H*a_baro (eta, 0);
-    su.x[] = alpha_eta.x[] = 0.;
+    su.x[] = 0., alpha_eta.x[] = 0.;
     foreach_layer() {
       double hl = h[-1] > dry ? h[-1] : 0.;
       double hr = h[] > dry ? h[] : 0.;
@@ -162,8 +162,7 @@ event acceleration (i++)
   [relaxation function](nh.h#relax_nh) of the non-hydrostatic solver)
   need to be restricted to all levels. */
   
-  // fixme: what about fm?
-  restriction ({cm, zb, h, hf, alpha_eta});
+  restriction ({cm, fm, zb, h, hf, alpha_eta});
 
   /**
   The restriction function for $\eta$, which has been modified by the

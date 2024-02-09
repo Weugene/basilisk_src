@@ -5,7 +5,7 @@
 #define MINLEVEL 5
 
 // metres to degrees
-double mtd = 360./40075e3;
+const double mtd = 360./40075e3;
 
 int main()
 {
@@ -22,13 +22,13 @@ int main()
 }
 
 // M2 tidal frequency. The period is 12h25 (745 minutes).
-#define M2F (2.*M_PI/745.)
+const double u0 = 1., M2F = 2.*pi/745.;
 
 // "radiation" boundary conditions on left,right,top,bottom
-u.n[left]   = - radiation (  sin(M2F*t));
-u.n[top]    =   radiation (  sin(M2F*t));
-u.n[right]  = + radiation (- sin(M2F*t));
-u.n[bottom] = - radiation (- sin(M2F*t));
+u.n[left]   = - radiation (  u0*sin(M2F*t));
+u.n[top]    =   radiation (  u0*sin(M2F*t));
+u.n[right]  = + radiation (- u0*sin(M2F*t));
+u.n[bottom] = - radiation (- u0*sin(M2F*t));
 
 event init (i = 0)
 {
@@ -55,9 +55,10 @@ event logfile (i++) {
   fprintf (stderr, "%g %d %g %g %g %g %g %g\n", t, i, s.min, s.max, s.sum, 
 	   n.rms, n.max, dt);
 
+  double C_f = 1e-4;
   foreach() {
     // quadratic bottom friction, coefficient 1e-4 (dimensionless)
-    double a = h[] < dry ? HUGE : 1. + 1e-4*dt*norm(u)/(h[]*mtd);
+    double a = h[] < dry ? HUGE : 1. + C_f*dt*norm(u)/(h[]*mtd);
     foreach_dimension()
       u.x[] /= a;
   }

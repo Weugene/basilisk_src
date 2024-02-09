@@ -20,7 +20,7 @@ and are damped on the right-hand side. */
 int main()
 {
   X0 = -10;
-  L0 = 25;
+  L0 = 25 [1];
   Y0 = -L0/2.;
   G = 9.81;
 
@@ -45,22 +45,24 @@ We declare a new field to store the maximum wave amplitude. */
 
 scalar maxa[];
 
+/**
+Periodic waves with period one second are generated on the
+left-hand-side. We tune the amplitude of the "radiation" condition
+to match that of the experiment as measured by wave gauges. This is
+different for the two solvers, in particular because of the
+different spatial resolutions. It would be nice to devise a
+resolution-independent wave generator. */
+
+double T0 = 1.;
+#if ML
+double A = 0.06;
+#else
+double A = 0.042; // 0.049
+#endif
+
 event init (i = 0)
 {
-
-  /**
-  Periodic waves with period one second are generated on the
-  left-hand-side. We tune the amplitude of the "radiation" condition
-  to match that of the experiment as measured by wave gauges. This is
-  different for the two solvers, in particular because of the
-  different spatial resolutions. It would be nice to devise a
-  resolution-independent wave generator. */
-
-#if ML
-  u.n[left]  = - radiation (0.06*sin(2.*pi*t/1.)); // 0.049
-#else
-  u.n[left]  = - radiation (0.042*sin(2.*pi*t/1.));
-#endif
+  u.n[left]  = - radiation (A*sin(2.*pi*t/T0));
   u.n[right] = + radiation (0);
   
   /**
@@ -107,10 +109,11 @@ To implement an absorbing boundary condition, we add an area for $x >
 12$ for which quadratic friction increases linearly with $x$. */
 
 event friction (i++) {
+  double b = 2. [-1];
   foreach() 
     if (x > 12.) {
-      double a = h[] < dry ? HUGE : 1. + 2.*(x - 12.)*dt*norm(u)/h[];
-#if ML      
+      double a = h[] < dry ? HUGE : 1. [0] + b*(x - 12.)*dt*norm(u)/h[];
+#if ML
       foreach_layer()
 #endif
 	foreach_dimension()

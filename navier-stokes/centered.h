@@ -69,7 +69,7 @@ for which inertia is negligible compared to viscosity. */
 
 (const) face vector mu = zerof, a = zerof, alpha = unityf;
 (const) scalar rho = unity;
-mgstats mgp, mgpf, mgu;
+mgstats mgp = {0}, mgpf = {0}, mgu = {0};
 bool stokes = false;
 
 /**
@@ -134,7 +134,8 @@ event defaults (i = 0)
   p.nodump = pf.nodump = true;
   
   /**
-  The default density field is set to unity (times the metric). */
+  The default density field is set to unity (times the metric and the
+  solid factors). */
 
   if (alpha.x.i == unityf.x.i) {
     alpha = fm;
@@ -170,6 +171,13 @@ event defaults (i = 0)
     s.embed_gradient = pressure_embed_gradient;
 #endif // EMBED
 #endif // TREE
+
+  /**
+  We set the dimensions of the velocity field. */
+
+  foreach()
+    foreach_dimension()
+      dimensional (u.x[] == Delta/t);
 }
 
 

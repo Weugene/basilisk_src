@@ -744,6 +744,20 @@ void check_missing_reductions (Ast * n, Stack * stack, Ast * scope)
 }
 
 static
+bool is_point_variable (const Ast * ref)
+{
+  Ast * identifier =
+    ast_schema (ast_parent (ref, sym_function_definition), sym_function_definition,
+		0, sym_function_declaration,
+		1, sym_declarator,
+		0, sym_direct_declarator,
+		0, sym_direct_declarator,
+		0, sym_generic_identifier,
+		0, sym_IDENTIFIER);
+  return identifier && !strcmp (ast_terminal (identifier)->start, "_Variables");
+}
+
+static
 void undefined_variables (Ast * n, Stack * stack, void * data)
 {
   Undefined * undef = data;
@@ -752,7 +766,9 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
 
   case sym_IDENTIFIER: {
     Ast * ref = ast_identifier_declaration (stack, ast_terminal (n)->start);
-
+    if (ref && is_point_variable (ref))
+      ref = NULL;
+    
     /**
     Reset state when the variable is declared. */
     
@@ -961,10 +977,10 @@ Ast * identifier_function_declaration (Stack * stack, char * name,
   return n;
 }
 
-static
-Ast * get_function_definition (Stack * stack, Ast * identifier,
-			       Ast * declaration)
+Ast * ast_get_function_definition (Stack * stack, Ast * identifier, Ast * declaration)
 {
+  if (!identifier)
+    return NULL;
   declaration = identifier_function_declaration
     (stack, ast_terminal (identifier)->start, declaration, NULL);
   Ast * function_definition = declaration;
@@ -985,7 +1001,7 @@ Ast * get_function_definition (Stack * stack, Ast * identifier,
 		   0, sym_generic_identifier,
 		   0, sym_IDENTIFIER))
     return NULL;
-  return get_function_definition (stack, identifier, declaration);
+  return ast_get_function_definition (stack, identifier, declaration);
 }
 
 static void append_function_declaration (Ast * parent, Ast * declaration)
@@ -1070,7 +1086,7 @@ static void point_function_calls (Ast * n, Stack * stack, void * data)
   }
 
   Ast * function_declaration = NULL;
-  Ast * function_definition = get_function_definition (stack, identifier, NULL);
+  Ast * function_definition = ast_get_function_definition (stack, identifier, NULL);
   if (function_definition) {
     function_declaration =
       identifier_function_declaration (stack, ast_terminal (identifier)->start,

@@ -1,5 +1,7 @@
 # -*-Makefile-*-
 
+export BASILISK := $(patsubst %/,%,$(dir $(realpath $(lastword $(MAKEFILE_LIST)))))
+
 PNG = png
 GENSUM = md5sum
 CHECKSUM = md5sum -c --status
@@ -12,9 +14,12 @@ export CHECKSUM
 export CC99
 export CFLAGS
 export CC
+export AWK
 QCC = $(BASILISK)/qcc
 
 check: $(subst .c,.tst,$(filter-out $(TESTS),$(filter-out $(EXCLUDE),$(ALLTESTS)))) Makefile.deps
+
+compile: $(subst .c,.s,$(filter-out $(TESTS),$(filter-out $(EXCLUDE),$(ALLTESTS)))) Makefile.deps
 
 tags: $(subst .page,.tags,$(ALLPAGES))
 
@@ -60,6 +65,7 @@ clean:
 		-o $*/$* $*.c $(LIBS) -lm
 	@rm -f $*/fail $*/warn
 	@OPENGLIBS="$(OPENGLIBS)" $(QCC) -autolink -nolineno $(STRIPFLAGS) 	\
+		-dimensions=dims -non-finite					\
 		$(subst -g ,,$(subst -O2 ,,$(CFLAGS))) 				\
 		$(subst .3D_,-grid=octree,$(findstring .3D_,$*_)) 		\
 		$< -o $@ $(LIBS) -lm 2> $*.log~ || 				\
@@ -67,13 +73,15 @@ clean:
 	 echo "qcc -autolink $(CFLAGS) -o $*/$* $*.c $(LIBS) -lm" > $*/fail &&	\
 	 cat $*.log~ >> $*/fail &&						\
 	 echo "make: *** [$*.s] Error 1" >> $*/fail &&				\
-	 rm -f $*.*tst &&							\
+	 rm -f $@ $*.*tst &&							\
 	 $(GENSUM) $*.c > $*/fail.tst &&					\
 	 cat $*/fail 2> /dev/stderr &&						\
 	 exit 1)
 	@chmod -x $@
-	@test ! -s $*.log~ || ( mkdir -p $* && cat $*.log~ > $*/warn )
+	@test ! -s $*.log~ || ( mkdir -p $* && cat $*.log~ > $*/warn && cat $*/warn 2> /dev/stderr )
 	@rm -f $*.log~ $*/fail
+	@test ! -f $*.dims.ref || diff $*.dims $*.dims.ref || (rm -f $@ && exit 1)
+#	@rm -f $*.dims
 
 %.prof: %.c
 	$(QCC) -autolink $(subst -DTRASH=1,,$(CFLAGS)) -g -no-pie -pg $< -o $*/$* -lm
@@ -96,16 +104,16 @@ clean:
 # warning: if this recipe is changed, runtest needs to be updated
 %/plots: %.c $(BASILISK)/gnuplot.awk $(BASILISK)/python.awk \
 		$(BASILISK)/gnuplot.sh
-	cd $* && gawk -f $(BASILISK)/gnuplot.awk < ../$*.c > plots && \
+	cd $* && $(AWK) -f $(BASILISK)/gnuplot.awk < ../$*.c > plots && \
 	PNG=$(PNG) sh $(BASILISK)/gnuplot.sh || rm -f plots
-	cd $* && gawk -f $(BASILISK)/python.awk < ../$*.c > plots.py && \
+	cd $* && $(AWK) -f $(BASILISK)/python.awk < ../$*.c > plots.py && \
 	python plots.py || rm -f plots
 	@test -f $*/plots || exit 1
 
 %/pdf-plots: %.c $(BASILISK)/gnuplot.awk $(BASILISK)/python.awk \
 		$(BASILISK)/gnuplot.sh
 	cd $* && \
-	gawk -v pdf=true -f $(BASILISK)/gnuplot.awk < ../$*.c > pdf-plots && \
+	$(AWK) -v pdf=true -f $(BASILISK)/gnuplot.awk < ../$*.c > pdf-plots && \
 	PNG=$(PNG) sh $(BASILISK)/gnuplot.sh . pdf-plots || rm -f pdf-plots
 	@test -f $*/pdf-plots || exit 1
 

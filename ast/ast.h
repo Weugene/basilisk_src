@@ -10,6 +10,7 @@ grammar-dependent functions.
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <float.h>
 #include "allocator.h"
 #include "stack.h"
 
@@ -49,6 +50,9 @@ void      ast_print_file_line  (Ast * n, FILE * fp);
 AstRoot * ast_get_root         (const Ast * n);
 void      ast_identifier_print (Ast * identifier, FILE * fp);
 void      ast_stack_print      (Stack * stack, FILE * fp);
+const
+char *    ast_crop_before (const char * s);
+double    ast_evaluate_constant_expression (const Ast * n);
 
 static inline Ast * ast_last_child (const Ast * n)
 {
@@ -152,7 +156,7 @@ char * str_prepend_realloc (char * dst, ...);
 #define ast_after(n,...)  str_append(ast_right_terminal (n)->after, __VA_ARGS__)
 #define ast_terminal(n) ((n)->child ? NULL : (AstTerminal *)(n))
 #define ast_root(n) ((n)->parent ? NULL : (AstRoot *)(n))
-char *  ast_str_append (Ast * n, char * s);
+char *  ast_str_append (const Ast * n, char * s);
 
 static inline void ast_hide (AstTerminal * n)
 {
@@ -195,10 +199,11 @@ static inline AstTerminal * NA (Ast * parent, int sym, const char * name)
 void  ast_push_declaration         (Stack * stack, Ast * declaration);
 Ast * ast_push_function_definition (Stack * stack, Ast * declarator);
 void  ast_pop_scope                (Stack * stack, Ast * scope);
+Ast * ast_push_declarations        (Ast * n, Stack * stack);
+void  ast_traverse                 (Ast * n, Stack * stack,
+				    void func (Ast *, Stack *, void *),
+				    void * data);
 
-void  ast_traverse (Ast * n, Stack * stack,
-		    void func (Ast *, Stack *, void *),
-		    void * data);
 #define foreach_item(list, index, item)					\
   for (Ast * _list = list, * item = _list && _list != ast_placeholder ?	\
 	 (_list->child[1] ? _list->child[index] : _list->child[0]) : NULL; \
@@ -208,6 +213,12 @@ void  ast_traverse (Ast * n, Stack * stack,
 	 (_list->child[1] ? _list->child[index] :			\
 	  _list->child[0]) : NULL					\
        )
+
+#define foreach_item_r(list, symbol, arg)				\
+  while (list->child[0]->sym == list->sym)				\
+    list = list->child[0];						\
+  for (Ast * arg = ast_child (list, symbol); arg;			\
+       list = list->parent, arg = ast_child (list, symbol))
 
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
 Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier,
@@ -224,6 +235,7 @@ Ast * ast_is_typedef (const Ast * identifier);
 Ast * ast_find_function (Ast * n, const char * name);
 Ast * ast_list_append_list (Ast * list, Ast * list1);
 Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item);
+Ast * ast_block_list_prepend (Ast * list, int item_sym, Ast * item);
 Ast * ast_block_list_insert_after (Ast * insert, Ast * item);
 Ast * ast_block_list_insert_before (Ast * insert, Ast * item);
 Ast * ast_block_list_insert_before2 (Ast * insert, Ast * item);
@@ -231,21 +243,44 @@ Ast * ast_block_list_get_item (Ast * statement);
 Ast * ast_list_append (Ast * list, int item_sym, Ast * item);
 Ast * ast_list_prepend (Ast * list, int item_sym, Ast * item);
 Ast * ast_list_remove (Ast * list, Ast * item);
+Ast * ast_list_insert_after (Ast * insert, Ast * item);
 void  ast_argument_list (Ast * expression);
+Ast * ast_new_cast_expression (Ast * parent);
 Ast * ast_new_unary_expression (Ast * parent);
 Ast * ast_new_constant (Ast * parent, int symbol, const char * value);
 Ast * ast_new_identifier (Ast * parent, const char * name);
 Ast * ast_new_member_identifier (Ast * parent, const char * name);
+Ast * ast_new_function_call (Ast * parent, const char * func);
+Ast * ast_new_empty_scalar (Ast * parent);
+Ast * ast_new_empty_vector (Ast * parent, int dimension);
+Ast * ast_new_empty_tensor (Ast * parent, int dimension);
 Ast * ast_is_unary_expression (const Ast * n);
 Ast * ast_is_identifier_expression (const Ast * n);
 Ast * ast_is_simple_expression (const Ast * n);
 Ast * ast_get_struct_name (Ast * declaration_specifiers);
 bool  ast_are_identical (const Ast * a, const Ast * b);
+Ast * ast_declaration_from_type (const Ast * type);
 Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension);
 AstTerminal * ast_type (const Ast * identifier);
 char * ast_typedef_name (const Ast * identifier);
+bool ast_is_field (const char * typename);
 
 Ast * ast_check_grammar (Ast * n, bool recursive);
 
+Ast * ast_get_function_definition (Stack * stack, Ast * identifier, Ast * declaration);
+bool  ast_is_foreach_stencil (const Ast * n);
 bool  ast_is_stencil_function (Ast * n);
+Ast * ast_is_point_function (const Ast * declarator);
 Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning);
+Ast * ast_is_point_point (const Ast * identifier);
+
+/**
+## Interface for the generic C interpreter */
+
+int ast_run (AstRoot * root, Ast * n, int verbosity, int maxcalls, void * data);
+
+/**
+## Interface for dimensional analysis */
+
+bool ast_check_dimensions (AstRoot * root, Ast * n, int verbosity, int maxcalls,
+			   FILE * dimensions, int finite, int redundant, int lineno, int warn);

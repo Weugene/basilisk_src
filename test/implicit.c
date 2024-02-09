@@ -55,7 +55,7 @@ The initial condition is a simple sinusoidal wave. The water depth is one. */
 
 event init (i = 0) {
   foreach()
-    h[] = 1. + amp*sin(2.*pi*x);
+    h[] = 1. + amp*sin(2.[-1]*pi*x);
 }
 
 /**

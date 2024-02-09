@@ -69,6 +69,9 @@ event defaults (i = 0) {
 
   if (alpha.x.i == unityf.x.i)
     alpha = fm;
+
+  if (rho.i == unity.i)
+    rho = cm;
 }
 
 event init (i = 0) {
@@ -145,13 +148,13 @@ event pressure (i++, last)
   if (constant(mu.x) != 0.) {
     foreach()
       foreach_dimension()
-        q.x[] = (q.x[] + dt*g.x[])/rho[];
+        q.x[] = (q.x[] + dt*g.x[])*cm[]/rho[];
     mgu = viscosity (q, mu, rho, dt, mgu.nrelax);
     foreach()
       foreach_dimension()
-        q.x[] = q.x[]*rho[] - dt*g.x[];
-  }  
-  
+        q.x[] = q.x[]*rho[]/cm[] - dt*g.x[];
+  }
+
   /**
   We first define a temporary face velocity field $\mathbf{u}_\star$
   using simple averaging from $\mathbf{q}_{\star}$, $\alpha_{n+1}$ and
@@ -190,7 +193,7 @@ event pressure (i++, last)
   \lambda = \frac{- 1}{\Delta t^2 \rho c^2}
   $$
   */
-
+  
   scalar lambda = rhoc2, rhs = ps;
   foreach() {
 
@@ -220,7 +223,7 @@ event pressure (i++, last)
   incompressible flows. */
   
   mgp = poisson (p, rhs, alpha, lambda, tolerance = TOLERANCE/sq(dt));
-
+  
   /**
   The pressure gradient is applied to $\mathbf{u}_\star$ to obtain the
   face velocity field at time $n + 1$. 
@@ -242,7 +245,7 @@ event pressure (i++, last)
   
   foreach()
     foreach_dimension() {
-      g.x[] = rho[]*(gf.x[] + gf.x[1])/2.;
+      g.x[] = rho[]*(gf.x[] + gf.x[1])/(2.*cm[]);
       q.x[] += dt*g.x[];
     }
 }

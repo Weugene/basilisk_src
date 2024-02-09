@@ -64,38 +64,34 @@ The function below uses the *tracer_fluxes* function to integrate the
 advection equation, using an explicit scheme with timestep *dt*, for
 each tracer in the list. */
 
-struct Advection {
-  scalar * tracers;
-  face vector u;
-  double dt;
-  scalar * src; // optional
-};
-
-void advection (struct Advection p)
+void advection (scalar * tracers, face vector u, double dt,
+		scalar * src = NULL)
 {
 
   /**
   If *src* is not provided we set all the source terms to zero. */
   
-  scalar * lsrc = p.src;
-  if (!lsrc)
-    for (scalar s in p.tracers)
-      lsrc = list_append (lsrc, zeroc);
-  assert (list_len(p.tracers) == list_len(lsrc));
+  scalar * psrc = src;
+  if (!src)
+    for (scalar s in tracers) {
+      const scalar zero[] = 0.;
+      src = list_append (src, zero);
+    }
+  assert (list_len (tracers) == list_len (src));
 
-  scalar f, src;
-  for (f,src in p.tracers,lsrc) {
+  scalar f, source;
+  for (f,source in tracers,src) {
     face vector flux[];
-    tracer_fluxes (f, p.u, flux, p.dt, src);
+    tracer_fluxes (f, u, flux, dt, source);
 #if !EMBED
     foreach()
       foreach_dimension()
-        f[] += p.dt*(flux.x[] - flux.x[1])/(Delta*cm[]);
+        f[] += dt*(flux.x[] - flux.x[1])/(Delta*cm[]);
 #else // EMBED
-    update_tracer (f, p.u, flux, p.dt);
+    update_tracer (f, u, flux, dt);
 #endif // EMBED
   }
 
-  if (!p.src)
-    free (lsrc);
+  if (!psrc)
+    free (src);
 }

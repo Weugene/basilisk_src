@@ -21,8 +21,9 @@ The initial condition for vorticity is just a white noise in the range
 $[-1:1]$ .*/
 
 event init (i = 0) {
+  double a = 1. [0,-1];
   foreach()
-    omega[] = noise();
+    omega[] = a*noise();
 }
 
 /**

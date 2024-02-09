@@ -75,7 +75,8 @@ int main()
   // number of grid points
   init_grid (64);
   // size of the box
-  size (1.);
+  size (1.[0]);
+  DT = HUGE[0];
   // acceleration of gravity
   G = 1.;
   // Coriolis parameter

@@ -5,7 +5,7 @@
 
 The default maximum timestep and CFL number. */
 
-double DT = 1e10, CFL = 0.5;
+double DT = HUGE [0,1], CFL = 0.5 [0];
 
 /**
 Performance statistics are stored in this structure. */
@@ -21,7 +21,7 @@ struct {
   double speed;
   // global timer
   timer gt;
-} perf;
+} perf = {0};
 
 /**
 Performance statistics are gathered by this function, which is
@@ -210,7 +210,7 @@ The $\theta$ global variable can be used to tune the limiting
 ($\theta=1$ gives minmod, the most dissipative limiter and $\theta=2$
 gives superbee, the least dissipative). */
 	  
-double theta = 1.3;
+double theta = 1.3 [0];
 
 double minmod2 (double s0, double s1, double s2)
 {
@@ -283,7 +283,7 @@ void vorticity (const vector u, scalar omega)
     omega[] = ((fm.x[1] - fm.x[])*u.y[] +
 	       fm.x[1]*u.y[1] - fm.x[]*u.y[-1] -
 	       (fm.y[0,1] - fm.y[])*u.x[] +
-	       fm.y[]*u.x[0,-1] - fm.y[0,1]*u.x[0,1])/(2.*cm[]*Delta + SEPS);
+	       fm.y[]*u.x[0,-1] - fm.y[0,1]*u.x[0,1])/(2.*(cm[] + SEPS)*Delta);
 }
 
 /**

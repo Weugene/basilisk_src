@@ -31,7 +31,8 @@ int main (int argc, char ** argv)
     dp[right] = dirichlet(0);
     dp[left]  = dirichlet(0);
   }
-  
+
+  size (1. [0]); // dimensionless
   origin (-0.5, -0.5, -0.5);
   int depth = argc < 2 ? (dimension <= 2 ? 9 : 6) :
     atoi(argv[1]), nrelax = 4;

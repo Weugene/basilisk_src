@@ -76,6 +76,12 @@ The domain is the periodic unit cube centered on the origin. */
 
 int main()
 {
+  /**
+  Space and time are dimensionless. This is necessary to be able to
+  use the 'mu = fm' trick. */
+
+  size (1. [0]);
+
   origin (-0.5, -0.5, -0.5);
   foreach_dimension()
     periodic (right);
@@ -87,7 +93,7 @@ int main()
   splitting errors and optimize convergence speed. */
   
   stokes = true;
-  DT = 2e-5;
+  DT = 2e-5 [0];
   TOLERANCE = HUGE;
   NITERMIN = 2;
   N = 1 << maxlevel;

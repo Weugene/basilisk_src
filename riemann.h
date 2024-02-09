@@ -54,7 +54,7 @@ void kurganov (double hm, double hp, double um, double up, double Delta,
       *dtmax = dt;
   }
   else
-    *fh = *fq = 0.;
+    *fh = 0., *fq = 0.;
 }
 
 void hllc (double hm, double hp, double um, double up, double Delta,

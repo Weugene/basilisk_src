@@ -45,6 +45,7 @@ off to avoid blunting off the wave crests. */
 
 int main()
 {
+  size (1 [0]); // space is dimensionless
   periodic (right);
   G = 0.;
   gradient = NULL;

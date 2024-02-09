@@ -22,7 +22,7 @@ int main()
   [meshlab](http://www.meshlab.net/). */
   
   system ("test -f distance.stl || "
-	  "(wget http://www-static.cc.gatech.edu/data_files/large_models/horse.ply.gz && "
+	  "(wget http://www.cc.gatech.edu/data_files/large_models/horse.ply.gz && "
 	  "gunzip -f horse.ply.gz && "
 	  "meshlabserver -i horse.ply -o distance.stl)");
 

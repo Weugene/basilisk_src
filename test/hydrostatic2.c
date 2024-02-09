@@ -22,8 +22,9 @@ void porous (scalar cs, face vector fs)
   int ns = 200;
   double xc[ns], yc[ns], R[ns];
   srand (0);
+  double a = 0.5, b = 0.04;
   for (int i = 0; i < ns; i++)
-    xc[i] = 0.5*noise(), yc[i] = 0.5*noise(), R[i] = 0.02 + 0.04*fabs(noise());
+    xc[i] = a*noise(), yc[i] = a*noise(), R[i] = 0.02 + b*fabs(noise());
 
   vertex scalar phi[];
   foreach_vertex() {

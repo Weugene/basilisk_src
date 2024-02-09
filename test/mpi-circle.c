@@ -43,6 +43,7 @@ int main (int argc, char * argv[])
   int minlevel = argc > 2 ? atoi(argv[2]) : 5;
   timer t;
 
+  size (1. [0]); // dimensionless
   init_grid (1);
   refine (level <= minlevel*(1. - sqrt(sq((x - 0.5) - 0.1) +
 				       sq((y - 0.5)- 0.1))));

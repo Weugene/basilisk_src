@@ -25,6 +25,7 @@ dp[bottom] = dirichlet(0);
 
 void solve (int depth)
 {
+  size (1. [0]); // dimensionless space
   origin (-0.5, -0.5);
   int nrelax = 4;
   init_grid(1);

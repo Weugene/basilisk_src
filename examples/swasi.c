@@ -20,11 +20,11 @@ length and time units. */
 
 int LEVEL = 7;
 
-#define Ri    4.     // inner radius (cm)
-#define Ro    32.    // outer radius (cm)
-#define Ho    0.074  // injection layer thickness (cm)
-#define Q     1e3    // flow rate (cm^3/s)
-#define R_45  5.6    // hyperbolic surface scaling (cm)
+const double Ri = 4. [1]; // inner radius (cm)
+const double Ro = 32.;    // outer radius (cm)
+const double Ho = 0.074;  // injection layer thickness (cm)
+const double Q  = 1e3;    // flow rate (cm^3/s)
+const double R_45 = 5.6;  // hyperbolic surface scaling (cm)
 
 /**
 We double the equivalent viscosity compared to that given in Foglizzo
@@ -32,19 +32,19 @@ et al. 2012 (0.03 cm^2/s), to obtain a more stable spiral mode. The
 "tube height" is set (by trial and error using 1D runs) so that the
 shock radius obtained numerically is close to 20 cm. */
 
-#define NU    0.06   // equivalent viscosity (cm^2/s)
-#define STEP  6.98   // height of exit tube (cm)
+const double NU = 0.06;   // equivalent viscosity (cm^2/s)
+const double STEP = 6.98; // height of exit tube (cm)
 
 /**
 The injection velocity is the flow rate divided by the surface area of
 the outer injection ring. */
 
-#define Uo (Q/(2.*pi*Ro*Ho))
+const double Uo = Q/(2.*pi*Ro*Ho);
 
 /**
 The maximum runtime (seconds). */
 
-#define TMAX 150.
+const double TMAX = 150.;
 
 /**
 ## Boundary conditions

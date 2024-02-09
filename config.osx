@@ -1,14 +1,16 @@
 # -*-Makefile-*-
+CC = /opt/homebrew/bin/gcc-13
+# the C99 flags
+C99_FLAGS = -std=c99
 
 # how to launch the C99 compiler
-CC99 = gcc -std=c99 -Wno-unused-result -Wno-unused-function 
+CC99 = $(CC) $(C99_FLAGS) -Wno-unused-result -Wno-unused-function
 
 # how to strip unused code
 # STRIPFLAGS = -fdata-sections -ffunction-sections -Wl,--gc-sections -w
 
 # other useful (non-standard) flags
-CFLAGS += -g -Wall -pipe
-# x86_64-apple-darwin -I/opt/local/include/ -lglfw -lGLEW -framework OpenGL
+CFLAGS += -g -Wall -Wno-unused-function -pipe -I/opt/local/include
 
 # if you have valgrind, otherwise comment this out
 # VALGRIND = valgrind -q --tool=memcheck \
@@ -16,7 +18,10 @@ CFLAGS += -g -Wall -pipe
 # 	 --leak-check=full
 
 # if gnuplot supports pngcairo, otherwise comment this out
-# PNG = pngcairo
+PNG = pngcairo
+
+# Awk
+AWK = awk
 
 # If you have managed to make gdb work (congratulations!), uncomment this
 # GDB = gdb
@@ -32,11 +37,13 @@ CHECKSUM = shasum -c --status
 # to use online visualisation with view.h. In this case, the following
 # two lines must be commented out. See [INSTALL#visualisation]() for details.
 
-OPENGLIBS = -lfb_dumb
-CFLAGS += -DDUMBGL
+OPENGLIBS = -lfb_tiny
+# OPENGLIBS = -lfb_glx -lGLEW -lGL -lX11
+# OPENGLIBS = -L/opt/local/lib/ -lfb_osmesa -lOSMesa
 
-#OPENGLIBS = -lfb_glx -lGLU -lGLEW -lGL -lX11
-#OPENGLIBS = -L/opt/local/lib/ -lfb_osmesa -lGLU -lOSMesa 
+
+# OPENGLIBS = -lfb_glx -lGLU -lGLEW -lGL -lX11
+# OPENGLIBS = -L/opt/local/lib/ -lfb_osmesa -lGLU -lOSMesa 
 
 # Compiler and libraries to use with CADNA.
 # See [README.cadna]() for more documentation.

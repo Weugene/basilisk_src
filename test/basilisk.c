@@ -117,9 +117,9 @@ pstoedit -f gnuplot -flat 0.1 basilisk.eps basilisk.gnu
 
   view (fov = 6.98459, tx = -0.444569, ty = -0.137936,
 	width = 640, height = 242);
-  squares ("level", min = 2, max = 12);
   for (double val = -20; val <= 20; val += 2.)
     isoline ("phi", val, lw = 0.5);
+  squares ("level", min = 2, max = 12);
   save ("mesh.png");
 
   /**

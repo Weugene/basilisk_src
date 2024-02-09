@@ -26,14 +26,11 @@ discussion. */
 #include "view.h"
 #include "navier-stokes/perfs.h"
 
-#define H0 0.6
-#define QL 1.
-#define BA 0.4
-#define NU 1e-2
+const double H0 = 0.6, QL = 1., BA = 0.4, NU = 1e-2, T0 = 10.;
 
 double hl = H0;
 
-u.n[left] = dirichlet((t < 10. ? t/10. : 1.)*3./2.*QL/hl*(y < hl ? 1. - sq(y/hl - 1.) : 1.));
+u.n[left] = dirichlet((t < T0 ? t/T0 : 1.)*3./2.*QL/hl*(y < hl ? 1. - sq(y/hl - 1.) : 1.));
 p[left] = neumann(0);
 pf[left] = neumann(0);
 
@@ -47,10 +44,10 @@ u.t[bottom] = dirichlet(0.);
 
 int main()
 {
-  size (30);
+  size (30 [1]);
   N = 32;
-  rho1 = 0.001;
-  rho2 = 1.;
+  rho1 = 0.001 [0];
+  rho2 = 1. [0];
   mu2 = NU;
   mu1 = mu2*rho1/rho2/10.;
   G.y = - 9.81;
@@ -64,7 +61,8 @@ event init (i = 0)
   
   fraction (f, y - H0);
 
-  solid (cs, fs, y - BA*exp(- sq(x - 10.)/5.) - 1e-3);
+  double a = 5.;
+  solid (cs, fs, y - BA*exp(- sq(x - 10.)/a) - 1e-3);
 }
 
 event update_hl (i++)

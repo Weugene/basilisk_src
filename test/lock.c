@@ -81,12 +81,12 @@ double nu_H = 0.01; // 200; // 0.01;
 
 int main()
 {
-  size (64e3);
+  size (64e3 [1]);
   N = 128;
   nl = 20;
   cell_lim = mono_limit;
   G = 9.81;
-  DT = 60;
+  DT = 60 [0,1];
   nu = 1e-4;
 
   const vector l[] = {HUGE}; // free slip
@@ -97,19 +97,20 @@ int main()
 
 event init (i = 0)
 {
+  double h0 = 20;
   foreach() {
-    zb[] = -20;
+    zb[] = - h0;
 #if ISOPYCNAL
     foreach_layer() {
       T[] = point.l < nl/2 ? 0.005 : 0;
       if (x > L0/2.)
-	h[] = point.l >= nl/2 ? 20./(nl/2) : 1e-4;
+	h[] = point.l >= nl/2 ? h0/(nl/2) : 1e-4;
       else
-	h[] = point.l <  nl/2 ? 20./(nl/2) : 1e-4;
+	h[] = point.l <  nl/2 ? h0/(nl/2) : 1e-4;
     }
 #else
     foreach_layer() {
-      h[] = 20./nl;
+      h[] = h0/nl;
       T[] = x < L0/2. ? 0.005 : 0;
     }
 #endif

@@ -1,4 +1,4 @@
-#define NOT_ZERO 1.e-30
+#define NOT_ZERO 1e-30
 
 /*-----------------------------------------------------*
  *MYC - Mixed Youngs and Central Scheme (2D)           *
@@ -17,8 +17,8 @@ coord mycs (Point point, scalar c)
 
   /* consider two lines: sgn(my) Y =  mx0 X + alpha,
      and: sgn(mx) X =  my0 Y + alpha */ 
-  mx0 = 0.5*(c_l-c_r);
-  my0 = 0.5*(c_b-c_t);
+  mx0 = 0.5*(c_l - c_r);
+  my0 = 0.5*(c_b - c_t);
 
   /* minimum coefficient between mx0 and my0 wins */
   if (fabs(mx0) <= fabs(my0)) {

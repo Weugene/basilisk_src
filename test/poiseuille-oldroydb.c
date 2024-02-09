@@ -67,6 +67,7 @@ int lev;
 
 int main()
 {
+  size (1.[0]);
   periodic (right);
   p[left] = dirichlet(1.);
   p[right] = dirichlet(0.);

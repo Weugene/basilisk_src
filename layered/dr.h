@@ -68,12 +68,9 @@ event acceleration (i++)
   added to the face acceleration field `ha`, using the
   [pressure-gradient macro](hydro.h#horizontal-pressure-gradient). */
   
-  foreach_face() {
-    double pg;
-    hpg (pg, q, 0)
-      ha.x[] += pg;
-    end_hpg(0);
-  }
+  foreach_face()
+    hpg (pg, q, 0,
+	 ha.x[] += pg);
 
   delete ({q});
 }

@@ -73,8 +73,9 @@ int main()
 event init (i = 0)
 {
   theta = 1.3; // tune limiting from the default minmod
+  double b = 200.;
   foreach()
-    h[] = 0.1 + 1.*exp(-200.*(x*x + y*y));
+    h[] = 0.1 + exp(- b*(x*x + y*y));
 }
 
 event logfile (i++) {

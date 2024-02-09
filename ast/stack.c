@@ -5,6 +5,8 @@
 struct _Stack {
   void * p;
   int n, size;
+  void * (* push) (Stack *, void *);
+  void * data;
 };
 
 Stack * stack_new (int size)
@@ -16,6 +18,8 @@ Stack * stack_new (int size)
 
 void stack_push (Stack * s, void * p)
 {
+  if (s->push)
+    p = s->push (s, p);
   s->n++;
   s->p = realloc (s->p, s->n*s->size);
   char * dest = ((char *)s->p) + (s->n - 1)*s->size;
@@ -40,4 +44,23 @@ void stack_destroy (Stack * s)
 {
   free (s->p);
   free (s);
+}
+
+void * stack_set_push (Stack * s, void * push (Stack *, void *))
+{
+  void * old = s->push;
+  s->push = push;
+  return old;
+}
+
+void * stack_set_data (Stack * s, void * data)
+{
+  void * old = s->data;
+  s->data = data;
+  return old;
+}
+
+void * stack_get_data (const Stack * s)
+{
+  return s->data;
 }

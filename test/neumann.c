@@ -44,6 +44,7 @@ double dirichlet_homogeneous_bc (Point point, Point neighbor,
 int main()
 {
   for (N = 32; N <= 512; N *= 2) {
+    size (1. [0]); // dimensionless
     origin (-L0/2., -L0/2.);
     init_grid (N);
 

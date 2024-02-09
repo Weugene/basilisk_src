@@ -50,10 +50,10 @@ event init (t = 0)
   that it is necessary to initialise the streamfunction, as the Poisson
   solver requires an initial guess. */
 
-  double dd = 0.1;
+  double dd = 0.1, a = 10., omega0 = 1.[0,-1];
   foreach() {
-    omega[] = (exp(-(sq(x - dd) + sq(y))/(dd/10.)) +
-	       exp(-(sq(x + dd) + sq(y))/(dd/10.)));
+    omega[] = omega0*(exp(-(sq(x - dd) + sq(y))/(dd/a)) +
+		      exp(-(sq(x + dd) + sq(y))/(dd/a)));
     psi[] = 0.;
   }
 
@@ -72,7 +72,7 @@ event init (t = 0)
   $$ */
 
   poisson (psi, omega);
-  coord f = {-1.,1.};
+  coord f = {-1.[0],1.[0]};
   foreach()
     foreach_dimension()
       u.x[] = f.x*(psi[0,1] - psi[0,-1])/(2.*Delta);

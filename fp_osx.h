@@ -198,7 +198,22 @@ fedisableexcept (unsigned int excepts)
   return ( fesetenv (&fenv) ? -1 : old_excepts );
 }
 
-#endif  // PPC or INTEL enabling
+#else // not PPC and not INTEL
+
+// This is an unsupported architecture.
+// This could be ARM (for example) and should be completed somehow...
+// Volunteers welcome...
+
+int
+fegetexcept (void) { return 0; }
+
+int
+feenableexcept (unsigned int excepts) { return 0; }
+
+int
+fedisableexcept (unsigned int excepts) { return 0; }
+
+#endif  // not PPC and no INTEL
 #endif  // not LINUX
 
 #if DEFINED_PPC

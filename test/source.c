@@ -19,6 +19,14 @@ int main()
   origin (- L0/2., - L0/2.);
   G = 9.81;
   N = 1 << LEVEL;
+  
+  /**
+  We start with a dry riverbed, so that the problem does not have a
+  natural timescale the Saint-Venant solver can use. We set a maximum
+  timestep to set this timescale. */
+  
+  DT = 1e-2;
+  
   run();
 }
 
@@ -53,14 +61,6 @@ the head of the valley. */
 event init (i = 0)
 {
   mask (fabs(x) < 0.5 && fabs(y - 3.5) < Delta/2. ? source : none);
-  
-  /**
-  We start with a dry riverbed, so that the problem does not have a
-  natural timescale the Saint-Venant solver can use. We set a maximum
-  timestep to set this timescale. */
-  
-  DT = 1e-2;
-
   foreach()
     zb[] = (- cos(x) + y)/2.;
 }

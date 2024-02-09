@@ -30,8 +30,10 @@ necessary, we allocate a new vector field to store it. */
 event defaults (i = 0) {  
   if (is_constant(a.x)) {
     a = new face vector;
-    foreach_face()
+    foreach_face() {
       a.x[] = 0.;
+      dimensional (a.x[] == Delta/sq(DT));
+    }
   }
 }
 
@@ -104,7 +106,7 @@ event acceleration (i++)
 	  phi[-1] < nodata ? phi[-1] :
 	  0.;
 
-	ia.x[] += alpha.x[]/fm.x[]*phif*(f[] - f[-1])/Delta;
+	ia.x[] += alpha.x[]/(fm.x[] + SEPS)*phif*(f[] - f[-1])/Delta;
       }
 
   /**

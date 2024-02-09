@@ -272,7 +272,7 @@ double update_saint_venant (scalar * evolving, scalar * updates, double dtmax)
 	Fq.y.x[] = fm.x[]*fv;
       }
       else // dry
-	Fh.x[] = Fq.x.x[] = S.x[] = Fq.y.x[] = 0.;
+	Fh.x[] = 0., Fq.x.x[] = S.x[] = Fq.y.x[] = 0.;
     }
 
     /**
@@ -403,8 +403,11 @@ into account user-defined field initialisations. */
 
 event init (i = 0)
 {
-  foreach()
+  foreach() {
     eta[] = zb[] + h[];
+    dimensional (h[] == Delta);
+    dimensional (u.x[] == Delta/DT);
+  }
 }
 
 /**

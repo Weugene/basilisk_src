@@ -112,8 +112,14 @@ The domain spans [0:2]. We will compute only a quarter of the droplet,
 making use of axisymmetry and right-left symmetry. The surface tension
 coefficient is unity. The viscosity coefficients are variable. */
 
-int main() { 
-  L0 = 2;
+int main() {
+
+  /**
+  Space and time are dimensionless. */
+
+  L0 = 2[0];
+  DT = HUGE[0];
+  
   N = 1 << LEVEL;
   f.sigma = 1.;
   mu = muv;

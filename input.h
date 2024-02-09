@@ -13,21 +13,11 @@ changed using the optional *ox*, *oy* and *width* parameters. */
 
 #include "utils.h"
 
-struct InputPGM {
-  // compulsory
-  scalar s;
-  FILE * fp;
-  // optional
-  double ox, oy, width;
-};
-
-void input_pgm (struct InputPGM p)
+void input_pgm (scalar s, FILE * fp,
+		double ox = 0., double oy = 0., double width = L0)
 {
-  scalar s = p.s;
-  if (p.width == 0.) p.width = L0;
-
   char line[81];
-  if (!fgets (line, 81, p.fp)) {
+  if (!fgets (line, 81, fp)) {
     fprintf (stderr, "input_pgm: could not read magic number\n");
     exit (1);
   }
@@ -37,17 +27,17 @@ void input_pgm (struct InputPGM p)
     exit (1);
   }
   int binary = !strcmp (line, "P5\n");
-  if (!fgets (line, 81, p.fp)) {
+  if (!fgets (line, 81, fp)) {
     fprintf (stderr, "input_pgm: could not read width and height\n");
     exit (1);
   }
-  int width, height;
-  while (line[0] == '#' && fgets (line, 81, p.fp));
-  if (line[0] == '#' || sscanf (line, "%d %d", &width, &height) != 2) {
+  int W, H;
+  while (line[0] == '#' && fgets (line, 81, fp));
+  if (line[0] == '#' || sscanf (line, "%d %d", &W, &H) != 2) {
     fprintf (stderr, "input_pgm: could not read width and height\n");
     exit (1);
   }
-  if (!fgets (line, 81, p.fp)) {
+  if (!fgets (line, 81, fp)) {
     fprintf (stderr, "input_pgm: could not read maxval\n");
     exit (1);
   }
@@ -57,46 +47,46 @@ void input_pgm (struct InputPGM p)
     exit (1);
   }
   if (maxval < 256) {
-    unsigned char * a = qmalloc (width*height, unsigned char);
+    unsigned char * a = qmalloc (W*H, unsigned char);
     size_t n = 0;
     if (binary)
-      n = fread (a, 1, width*height, p.fp);
+      n = fread (a, 1, W*H, fp);
     else {
       int v;
-      while (n < width*height && fscanf (p.fp, "%d ", &v) == 1)
+      while (n < W*H && fscanf (fp, "%d ", &v) == 1)
 	a[n++] = v;
     }
-    if (n != width*height) {
+    if (n != W*H) {
       fprintf (stderr, "input_pgm: read only %ld values\n", n);
       exit (1);
     }
     foreach() {
-      int i = (x - p.ox)*width/p.width, j = (y - p.oy)*width/p.width;
-      if (i >= 0 && i < width && j >= 0 && j < height)
-	s[] = 1. - a[(height - 1 - j)*width + i]/(double)maxval;
+      int i = (x - ox)*W/width, j = (y - oy)*W/width;
+      if (i >= 0 && i < W && j >= 0 && j < H)
+	s[] = 1. - a[(H - 1 - j)*W + i]/(double)maxval;
       else
 	s[] = 0.;
     }
     free (a);
   }
   else {
-    unsigned short * a = qmalloc (width*height, unsigned short);
+    unsigned short * a = qmalloc (W*H, unsigned short);
     size_t n = 0;
     if (binary)
-      n = fread (a, 2, width*height, p.fp);
+      n = fread (a, 2, W*H, fp);
     else {
       int v;
-      while (n < width*height && fscanf (p.fp, "%d ", &v) == 1)
+      while (n < W*H && fscanf (fp, "%d ", &v) == 1)
 	a[n++] = v;
     }
-    if (n != width*height) {
+    if (n != W*H) {
       fprintf (stderr, "input_pgm: read only %ld values\n", n);
       exit (1);
     }
     foreach() {
-      int i = (x - p.ox)*width/p.width, j = (y - p.oy)*width/p.width;
-      if (i >= 0 && i < width && j >= 0 && j < height)
-	s[] = 1. - a[(height - 1 - j)*width + i]/(double)maxval;
+      int i = (x - ox)*W/width, j = (y - oy)*W/width;
+      if (i >= 0 && i < W && j >= 0 && j < H)
+	s[] = 1. - a[(H - 1 - j)*W + i]/(double)maxval;
       else
 	s[] = 0.;
     }
@@ -149,8 +139,8 @@ static int next_string (FILE * fp, const char * target)
 # *input_gfs()*: Gerris simulation format
 
 The function reads simulation data in the format used in
-[Gerris](http://gfs.sf.net) simulation files. This is the reciprocal
-function of [*output_gfs()*](output.h#output_gfs).
+[Gerris](http://gerris.dalembert.upmc.fr) simulation files. This is
+the reciprocal function of [*output_gfs()*](output.h#output_gfs).
 
 The arguments and their default values are:
 
@@ -164,38 +154,34 @@ The arguments and their default values are:
 : the name of the file to read from (mutually exclusive with *fp*). */
 
 trace
-void input_gfs (struct OutputGfs p)
+void input_gfs (FILE * fp = stdin,
+		scalar * list = NULL,
+		char * file = NULL)
 {
   not_mpi_compatible();
   
-  bool opened = false;
-  if (p.fp == NULL) {
-    if (p.file == NULL)
-      p.fp = stdin;
-    else if (!(p.fp = fopen (p.file, "r"))) {
-      perror (p.file);
-      exit (1);
-    }
-    else
-      opened = true;
+  if (file && !(fp = fopen (file, "r"))) {
+    perror (file);
+    exit (1);
   }
-  bool input_all = (p.list == all);
-  if (p.list == NULL) p.list = all;
+
+  bool input_all = (list == all);
+  if (!list) list = all;
 
   #if TREE
   init_grid (1);
   #endif
 
-  next_char (p.fp, '{');
+  next_char (fp, '{');
   
   char * s = qmalloc (1, char);
   int len = 0;
-  int c = fgetc(p.fp);
+  int c = fgetc(fp);
   while (c != EOF && c != '}') {
     s[len++] = c;
     qrealloc (s, len + 1, char);
     s[len] = '\0';
-    c = fgetc(p.fp);
+    c = fgetc(fp);
   }
   if (c != '}') {
     fprintf (stderr, "input_gfs(): error: expecting '}'\n");
@@ -223,7 +209,7 @@ void input_gfs (struct OutputGfs p)
   while (s1) {
     char * name = replace (s1, '_', '.', false);
     bool found = false;
-    for (scalar s in p.list)
+    for (scalar s in list)
       if (!is_constant(s) && s.name && !strcmp (s.name, name)) {
 	input = list_append (input, s);
 	found = true; break;
@@ -243,28 +229,28 @@ void input_gfs (struct OutputGfs p)
   }
   free (s);
 
-  next_char (p.fp, '{');
+  next_char (fp, '{');
   double t1 = 0.;
-  if (next_string (p.fp, "Time") >= 0) {
-    next_char (p.fp, '{');
-    next_char (p.fp, 't');
-    next_char (p.fp, '=');
-    if (fscanf (p.fp, "%lf", &t1) != 1) {
+  if (next_string (fp, "Time") >= 0) {
+    next_char (fp, '{');
+    next_char (fp, 't');
+    next_char (fp, '=');
+    if (fscanf (fp, "%lf", &t1) != 1) {
       fprintf (stderr, "input_gfs(): error: expecting 't'\n");
       exit (1);
     }
-    next_char (p.fp, '}');
-    next_char (p.fp, '}');
+    next_char (fp, '}');
+    next_char (fp, '}');
   }
 
-  if (next_string (p.fp, "Box") < 0) {
+  if (next_string (fp, "Box") < 0) {
     fprintf (stderr, "input_gfs(): error: expecting 'GfsBox'\n");
     exit (1);
   }
 
-  next_char (p.fp, '{');
-  next_char (p.fp, '{');
-  next_char (p.fp, '\n');
+  next_char (fp, '{');
+  next_char (fp, '{');
+  next_char (fp, '\n');
 
   scalar * listm = {cm,fm};
   scalar * listr = !is_constant(cm) ? listm : NULL;
@@ -272,19 +258,19 @@ void input_gfs (struct OutputGfs p)
 
   foreach_cell() {
     unsigned flags;
-    if (fread (&flags, sizeof (unsigned), 1, p.fp) != 1) {
+    if (fread (&flags, sizeof (unsigned), 1, fp) != 1) {
       fprintf (stderr, "input_gfs(): error: expecting 'flags'\n");
       exit (1);
     }
     if (!(flags & (1 << 4)) && is_leaf(cell))
       refine_cell (point, listr, 0, NULL);
     double a;
-    if (fread (&a, sizeof (double), 1, p.fp) != 1 || a != -1) {
+    if (fread (&a, sizeof (double), 1, fp) != 1 || a != -1) {
       fprintf (stderr, "input_gfs(): error: expecting '-1'\n");
       exit (1);
     }
     for (scalar s in input) {
-      if (fread (&a, sizeof (double), 1, p.fp) != 1) {
+      if (fread (&a, sizeof (double), 1, fp) != 1) {
 	fprintf (stderr, "input_gfs(): error: expecting a scalar\n");
 	exit (1);
       }
@@ -322,8 +308,8 @@ void input_gfs (struct OutputGfs p)
       s.dirty = true;
 
   free (input);
-  if (opened)
-    fclose (p.fp);
+  if (file)
+    fclose (fp);
 
   // the events are advanced to catch up with the time
   while (t < t1 && events (false))
@@ -368,29 +354,17 @@ the raster file.
 interpolation. Default is zero.
 */
 
-struct InputGRD {
-  scalar s;
-  FILE * fp;
-  char * file;
-  double nodatavalue;
-  bool linear, periodic, zero;
-  int smooth;
-};
-
-void input_grd (struct InputGRD p)
+void input_grd (scalar s,
+		FILE * fp = stdin, const char * file = NULL,
+		double nodatavalue = 0.,
+		bool linear = false, bool periodic = false, bool zero = false,
+		int smooth = 0)
 {
-  scalar input = p.s;
+  scalar input = s;
 
-  bool opened = false;
-  if (p.fp == NULL) {
-    if (p.file == NULL)
-      p.fp = stdin;
-    else if (!(p.fp = fopen (p.file, "r"))) {
-      perror (p.file);
-      exit (1);
-    }
-    else
-      opened = true;
+  if (file && !(fp = fopen (file, "r"))) {
+    perror (file);
+    exit (1);
   }
   
   // Variables for the Raster data
@@ -400,59 +374,59 @@ void input_grd (struct InputGRD p)
 
   // header
   char waste[100];
-  if (fscanf (p.fp, "%s %d", waste, &nx) != 2) {
+  if (fscanf (fp, "%s %d", waste, &nx) != 2) {
     fprintf (stderr, "input_grd(): error reading 'nx'\n");
-    if (opened) fclose (p.fp);
+    if (file) fclose (fp);
     return;
   }
-  if (fscanf (p.fp, "%s %d", waste, &ny) != 2) {
+  if (fscanf (fp, "%s %d", waste, &ny) != 2) {
     fprintf (stderr, "input_grd(): error reading 'ny'\n");
-    if (opened) fclose (p.fp);
+    if (file) fclose (fp);
     return;
   }
-  if (fscanf (p.fp, "%s %lf", waste, &XG0) != 2) {
+  if (fscanf (fp, "%s %lf", waste, &XG0) != 2) {
     fprintf (stderr, "input_grd(): error reading 'XG0'\n");
-    if (opened) fclose (p.fp);
+    if (file) fclose (fp);
     return;    
   }
-  if (fscanf (p.fp, "%s %lf", waste, &YG0) != 2) {
+  if (fscanf (fp, "%s %lf", waste, &YG0) != 2) {
     fprintf (stderr, "input_grd(): error reading 'YG0'\n");
-    if (opened) fclose (p.fp);
+    if (file) fclose (fp);
     return;    
   }
-  if (fscanf (p.fp, "%s %lf", waste, &DeltaGRD) != 2) {
+  if (fscanf (fp, "%s %lf", waste, &DeltaGRD) != 2) {
     fprintf (stderr, "input_grd(): error reading 'DeltaGRD'\n");
-    if (opened) fclose (p.fp);
+    if (file) fclose (fp);
     return;    
   }
-  if (fscanf (p.fp, "%s %lf", waste, &ndv) != 2) {
+  if (fscanf (fp, "%s %lf", waste, &ndv) != 2) {
     fprintf (stderr, "input_grd(): error reading 'ndv'\n");
-    if (opened) fclose (p.fp);
+    if (file) fclose (fp);
     return;    
   }
 
   //default value of NoData value
-  if (!p.nodatavalue)
-    p.nodatavalue = ndv;
+  if (!nodatavalue)
+    nodatavalue = ndv;
 
   // read the data
   double * value = qmalloc (nx*ny, double);
   for (int i = ny - 1; i >= 0; i--)
     for (int j = 0 ; j < nx; j++) {
-      if (fscanf (p.fp, "%lf ", &value[j + i*nx]) != 1) {
+      if (fscanf (fp, "%lf ", &value[j + i*nx]) != 1) {
 	fprintf (stderr, "input_grd(): error reading value %d,%d\n", i, j);
-	if (opened) fclose (p.fp);
+	if (file) fclose (fp);
 	free (value);
 	return;
       }
-      if (p.zero && value[j + i*nx] == ndv)
+      if (zero && value[j + i*nx] == ndv)
 	value[j + i*nx] = 0.;
     }
 
   // Laplacian smoothing
-  if (p.smooth > 0) {
+  if (smooth > 0) {
     double * smoothed = qmalloc (nx*ny, double);
-    for (int s = 0; s < p.smooth; s++) {
+    for (int s = 0; s < smooth; s++) {
       for (int i = 0; i < ny; i++)
 	for (int j = 0 ; j < nx; j++) {
 	  int n = 0;
@@ -465,7 +439,7 @@ void input_grd (struct InputGRD p)
 		  value[j + l + (i + k)*nx] != ndv)
 		smoothed[j + i*nx] += value[j + l + (i + k)*nx], n++;
 	  if (n == 0)
-	    smoothed[j + i*nx] = p.zero ? 0. : ndv;
+	    smoothed[j + i*nx] = zero ? 0. : ndv;
 	  else
 	    smoothed[j + i*nx] /= n;
 	}
@@ -476,7 +450,7 @@ void input_grd (struct InputGRD p)
   
   bool warning = false;  
   foreach (serial) {
-    if (p.periodic || input.boundary[right] == periodic_bc) {
+    if (periodic || input.boundary[right] == periodic_bc) {
       if (x > XG0 + nx*DeltaGRD)
 	x -= nx*DeltaGRD;
       else if (x < XG0)
@@ -490,7 +464,7 @@ void input_grd (struct InputGRD p)
       // Test if we are on the ring of data around the raster grid
       int j1 = (x - XG0)/DeltaGRD;
       int i1 = (y - YG0)/DeltaGRD;
-      if (p.linear && i1 >= 0 && j1 >= 0 && i1 < ny - 1 && j1 < nx - 1 &&
+      if (linear && i1 >= 0 && j1 >= 0 && i1 < ny - 1 && j1 < nx - 1 &&
 	  value[j1 + i1*nx] != ndv && value[j1 + 1 + i1*nx] != ndv &&
 	  value[j1 + (i1 + 1)*nx] != ndv && value[j1 + 1 + (i1 + 1)*nx] != ndv) {
 	// bi-linear interpolation
@@ -522,6 +496,6 @@ void input_grd (struct InputGRD p)
 	     "input_grd(): Warning: Raster data is not covering all"
 	     " the simulation area\n");
 
-  if (opened)
-    fclose (p.fp);
+  if (file)
+    fclose (fp);
 }

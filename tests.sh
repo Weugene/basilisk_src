@@ -34,7 +34,10 @@ showpages()
     for f in $files; do
 	case "$f" in
 	    *.page) echo "$f" ;;
-	    *.[chm]) $BASILISK/darcsit/pagemagic "$f" && echo "$f.page" ;;
+	    *.[chm])
+		test -x $BASILISK/darcsit/pagemagic && \
+		    $BASILISK/darcsit/pagemagic "$f" && echo "$f.page"
+		;;
 	esac
     done | sed 's/\(.*\)/	\1 \\/g'
 }
@@ -59,15 +62,12 @@ echo "updating Makefile.tests"
 	 sed -n 's/\(^[a-zA-Z_0-9-]*\)\.*tst[ ]*:.*/	\1.c \\/p'
     ) | sort | uniq
     echo ""
-    echo "plots: \\"
-    showfiles plot | sed 's/\(.*\)\.plot/\1\/plot.png/g'
-    showpages '.c' | sed 's/\(.*\)\.c/\1\/plots/g'
-    echo ""
     echo "TESTS = \\"
     singleline < Makefile | 		                   \
 	grep '^check:' | tr ' ' '\n' |                     \
 	sed -n 's/[ 	]*\([a-zA-Z_0-9-]*\..tst\)[ 	]*/\1/p' |  \
-	sed 's/\(.*\)\..tst/	\1.c \\/g'
+	sed 's/\(.*\)\..tst/	\1.c \\/g' | \
+	sed 's/.*$(wildcard//g'
     singleline < Makefile | 		                   \
 	grep -v '^check:' | grep '^[^.]*:.*' | tr ' ' '\n' |     \
 	sed -n 's/[ 	]*\([a-zA-Z_0-9-]*\.tst\)[ 	]*/\1/p' |    \

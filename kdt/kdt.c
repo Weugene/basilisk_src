@@ -249,7 +249,7 @@ static int put (KdtHeap * h, KdtPoint * p, KdtHeap * merged)
   return kdt_heap_get (h, p);
 }
 
-static void kdt_write (KdtHeap * h, FILE * fp)
+void kdt_write (KdtHeap * h, FILE * fp)
 {
   kdt_heap_rewind (h);
   long i = 0;
@@ -345,9 +345,6 @@ typedef struct {
   int n1;
 } Node;
 
-#define SYSTEM_32_BITS (!defined (__LP64__) && !defined (__64BIT__) && \
-                        !defined (_LP64) && !(__WORDSIZE == 64))
-
 typedef struct {
   KdtRect bound;
   long len;
@@ -368,7 +365,8 @@ struct _Kdt {
 
 static int check_32_bits (const Kdt * kdt)
 {
-#if SYSTEM_32_BITS
+#if (!defined (__LP64__) && !defined (__64BIT__) && \
+     !defined (_LP64) && !(__WORDSIZE == 64))
   long maxlen = (1 << 31)/sizeof (KdtPoint);
   if (kdt->h.len > maxlen) {
     fprintf (stderr, "kdt: 32-bits systems are limited to %ld data points\n", 
@@ -447,7 +445,7 @@ static float length (const KdtRect rect)
   return w > h ? w : h;
 }
 
-static void kdt_rect_write (const KdtRect rect, FILE * fp)
+void kdt_rect_write (const KdtRect rect, FILE * fp)
 {
   fprintf (fp, "%f %f\n%f %f\n%f %f\n%f %f\n%f %f\n\n",
 	   rect[0].l, rect[1].l, rect[0].h, rect[1].l,

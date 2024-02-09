@@ -1,22 +1,29 @@
-CFLAGS += -O2
+CFLAGS += $(C99_FLAGS) -O2
+
+export BASILISK = $(CURDIR)
 
 # these are not Basilisk programs
-EXCLUDE = qcc.c include.c postproc.c rotate.c stencils.c qplot.c
+EXCLUDE = qcc.c include.c postproc.c bview.c
 
-all: libast qcc qplot libkdt literatec libfb_dumb libws bview2D bview3D
-	@chmod +x ppm2mpeg ppm2mp4 ppm2ogv ppm2gif runtest \
-		sequence page2html
+TOPTARGETS = all clean check
+
+SUBDIRS = darcsit ast kdt wsServer gl
+
+.PHONY: subdirs $(SUBDIRS) $(TOPTARGETS)
+
+all: subdirs qcc literatec bview2D bview3D
+	@chmod +x ppm2mpeg ppm2mp4 ppm2ogv ppm2gif runtest page2html
 	@test -f xyz2kdt || ln -s kdt/xyz2kdt
 	@test -f kdtquery || ln -s kdt/kdtquery
 
-libast:
-	cd ast && make
+subdirs: $(SUBDIRS)
 
-libkdt:
-	cd kdt && make
+$(TOPTARGETS): $(SUBDIRS)
+$(SUBDIRS):
+	$(MAKE) -C $@ $(filter-out $(SUBDIRS),$(MAKECMDGOALS))
 
 literatec:
-	cd darcsit && make && cd cgi-bin && make
+	cd darcsit && $(MAKE) && cd cgi-bin && $(MAKE)
 
 qcc: qcc.c include.o postproc.o ast/libast.a config
 	$(CC) $(CFLAGS) -DLIBDIR=\"`pwd`\" \
@@ -24,54 +31,47 @@ qcc: qcc.c include.o postproc.o ast/libast.a config
 		-DCPP99="\"$(CPP99)\"" \
 		-DCADNACC="\"$(CADNACC)\"" \
 		-DBASILISK="\"$(BASILISK)\"" \
-		qcc.c include.o postproc.o -o qcc -Last -last
+		qcc.c include.o postproc.o -o qcc -Last -last -lm
 
 include.o: include.c
 	$(CC) $(CFLAGS) -DLIBDIR=\"`pwd`\" -c include.c
 
-qplot.o: qplot.c
-	$(CC) $(CFLAGS) -c qplot.c
+# uncomment the recipe below if you need to regenerate draw_get.h
+# and draw_json.h
 
-qplot: qplot.o
-	$(CC) $(CFLAGS) qplot.o -o qplot
+# draw_get.h: draw.h params.awk
+#	awk -f params.awk < draw.h > draw_get.h
 
-draw_get.h: draw.h params.awk
-	awk -f params.awk < draw.h > draw_get.h
+# Uncomment the recipes below if you need to re-generate include.c or
+# postproc.c
 
-draw_json.h: draw.h json.awk
-	awk -f json.awk < draw.h > draw_json.h
+# include.c: include.lex
+#	flex -P inc -o include.c include.lex
 
-include.c: include.lex
-	flex -P inc -o include.c include.lex
+# postproc.c: postproc.lex
+#	flex -P post -o postproc.c postproc.lex
 
-libfb_dumb:
-	cd gl && make libfb_dumb.a libglutils.a
+bview2D: qcc bview.c draw_get.h display.h view.h draw.h khash.h
+	./qcc $(CFLAGS) -autolink bview.c -o bview2D -lfb_tiny -lm
 
-libws:
-	cd wsServer && make
-
-postproc.c: postproc.lex
-	flex -P post -o postproc.c postproc.lex
-
-bview2D: qcc bview.c draw_get.h draw_json.h bview.s
-	qcc $(CFLAGS) -DDUMBGL -autolink bview.c -o bview2D -lfb_dumb -lm -lglutils
-
-bview3D: qcc bview.c draw_get.h draw_json.h bview.s
-	qcc $(CFLAGS) -DDUMBGL -autolink -grid=octree bview.c -o bview3D -lfb_dumb -lm
+bview3D: qcc bview.c draw_get.h display.h view.h draw.h khash.h
+	./qcc $(CFLAGS) -autolink -grid=octree bview.c -o bview3D -lfb_tiny -lm
 
 alltags:
-	cd navier-stokes && make tags
-	cd layered && make tags
-	cd ehd && make tags
-	cd examples && make tags
-	cd test && make tags
-	make tags
-	cd navier-stokes && make itags
-	cd layered && make itags
-	cd ehd && make itags
-	cd examples && make itags
-	cd test && make itags
-	make itags
+	cd navier-stokes && $(MAKE) tags
+	cd layered && $(MAKE) tags
+	cd ehd && $(MAKE) tags
+	cd compressible && $(MAKE) tags
+	cd examples && $(MAKE) tags
+	cd test && $(MAKE) tags
+	$(MAKE) tags
+	cd navier-stokes && $(MAKE) itags
+	cd layered && $(MAKE) itags
+	cd compressible && $(MAKE) itags
+	cd ehd && $(MAKE) itags
+	cd examples && $(MAKE) itags
+	cd test && $(MAKE) itags
+	$(MAKE) itags
 
 etags:
 	etags *.h grid/*.h

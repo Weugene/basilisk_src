@@ -108,7 +108,7 @@ int main (int argc, char **argv)
   rho1 = 1.;
   rho2 = 0.01;
   c.alpha = 1./30.;
-  TOLERANCE = 1e-4;
+  TOLERANCE = 1e-4 [*];
 	
   for (dcase = 1; dcase <= 4; dcase++) {
     switch (dcase) {

@@ -128,7 +128,7 @@ vector u;
 int main()
 {
   // Earth radius in metres
-  Radius = 6371220.;
+  Radius = 6371220. [1];
   // the domain is 73 degrees squared
   size (73.);
   // centered on 142,38 longitude,latitude
@@ -183,15 +183,15 @@ data](https://en.wikipedia.org/wiki/Shuttle_Radar_Topography_Mission)
 for Japan.
 
 See the [*xyz2kdt*
-manual](http://gfs.sourceforge.net/wiki/index.php/Xyz2kdt) to generate
-the ETOPO2 database.
+manual](http://gerris.dalembert.upmc.fr/xyz2kdt.html) to generate the
+ETOPO2 database.
 
 The SRTM database can be generated using the following script (which
 will need to be adapted as the USGS often changes its website)
 
 ~~~bash
 # SRTM_resultExport.csv from http://edcsns17.cr.usgs.gov/NewEarthExplorer/
-# see also http://gfs.sourceforge.net/wiki/index.php/Xyz2kdt
+# see also http://gerris.dalembert.upmc.fr/xyz2kdt.html
 
 files=`awk 'BEGIN{FS="\"|,"}{ if ($2!="ENTITY_ID") print $2;}' < SRTM_resultExport.csv | \
     sed 's/SRTM3//g' | \
@@ -273,17 +273,18 @@ event init (i = 0)
 
   u.n[left]   = - radiation(0);
   u.n[right]  = + radiation(0);
-  u.t[bottom] = - radiation(0);
-  u.t[top]    = + radiation(0);
+  u.n[bottom] = - radiation(0);
+  u.n[top]    = + radiation(0);
 }
 
 /**
 ## Quadratic bottom friction */
 
-event friction (i++)
+event viscous_term (i++)
 {
+  double C_f = 1e-4;
   foreach() {
-    double a = h[] < dry ? HUGE : 1. + 1e-4*dt*norm(u)/h[];
+    double a = h[] < dry ? HUGE : 1. + C_f*dt*norm(u)/h[];
     foreach_dimension()
       u.x[] /= a;
     if (h[] > dry && h[] + zb[] > etamax[])

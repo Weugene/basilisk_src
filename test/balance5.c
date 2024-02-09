@@ -108,7 +108,7 @@ int main (int argc, char * argv[])
   } while (refined);
 
   set_unused_pids();
-  debug_mpi (stderr);
+  debug_mpi (qerr);
 
   check_restriction (s);
 }

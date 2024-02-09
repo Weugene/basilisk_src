@@ -34,45 +34,32 @@ The arguments and their default values are:
 : the lower-left and upper-right coordinates of the domain to consider.
  Default is the entire domain. */
 
-struct OutputField {
-  scalar * list;
-  FILE * fp;
-  int n;
-  bool linear;
-  double box[2][2];
-};
-
 trace
-void output_field (struct OutputField p)
+void output_field (scalar * list = all,
+		   FILE * fp = stdout,
+		   int n = N,
+		   bool linear = false,
+		   double box[2][2] = {{X0, Y0},{X0 + L0, Y0 + L0}})
 {
-  if (!p.list) p.list = all;
-  if (p.n == 0) p.n = N;
-  if (!p.fp) p.fp = stdout;
-  p.n++;
-  if (p.box[0][0] == 0. && p.box[0][1] == 0. && 
-      p.box[1][0] == 0. && p.box[1][1] == 0.) {
-    p.box[0][0] = X0;      p.box[0][1] = Y0;
-    p.box[1][0] = X0 + L0; p.box[1][1] = Y0 + L0;
-  }
-
-  boundary (p.list);
-  int len = list_len(p.list);
-  double Delta = 0.999999*(p.box[1][0] - p.box[0][0])/(p.n - 1);
-  int ny = (p.box[1][1] - p.box[0][1])/Delta + 1;
-  double ** field = (double **) matrix_new (p.n, ny, len*sizeof(double));
-  for (int i = 0; i < p.n; i++) {
-    double x = Delta*i + p.box[0][0];
+  n++;
+  boundary (list);
+  int len = list_len(list);
+  double Delta = 0.999999*(box[1][0] - box[0][0])/(n - 1);
+  int ny = (box[1][1] - box[0][1])/Delta + 1;
+  double ** field = (double **) matrix_new (n, ny, len*sizeof(double));
+  for (int i = 0; i < n; i++) {
+    double x = Delta*i + box[0][0];
     for (int j = 0; j < ny; j++) {
-      double y = Delta*j + p.box[0][1];
-      if (p.linear) {
+      double y = Delta*j + box[0][1];
+      if (linear) {
 	int k = 0;
-	for (scalar s in p.list)
+	for (scalar s in list)
 	  field[i][len*j + k++] = interpolate (s, x, y);
       }
       else {
 	Point point = locate (x, y);
 	int k = 0;
-	for (scalar s in p.list)
+	for (scalar s in list)
 	  field[i][len*j + k++] = point.level >= 0 ? s[] : nodata;
       }
     }
@@ -80,32 +67,32 @@ void output_field (struct OutputField p)
 
   if (pid() == 0) { // master
 @if _MPI
-    MPI_Reduce (MPI_IN_PLACE, field[0], len*p.n*ny, MPI_DOUBLE, MPI_MIN, 0,
+    MPI_Reduce (MPI_IN_PLACE, field[0], len*n*ny, MPI_DOUBLE, MPI_MIN, 0,
 		MPI_COMM_WORLD);
 @endif
-    fprintf (p.fp, "# 1:x 2:y");
+    fprintf (fp, "# 1:x 2:y");
     int i = 3;
-    for (scalar s in p.list)
-      fprintf (p.fp, " %d:%s", i++, s.name);
-    fputc('\n', p.fp);
-    for (int i = 0; i < p.n; i++) {
-      double x = Delta*i + p.box[0][0];
+    for (scalar s in list)
+      fprintf (fp, " %d:%s", i++, s.name);
+    fputc('\n', fp);
+    for (int i = 0; i < n; i++) {
+      double x = Delta*i + box[0][0];
       for (int j = 0; j < ny; j++) {
-	double y = Delta*j + p.box[0][1];
+	double y = Delta*j + box[0][1];
 	//	map (x, y);
-	fprintf (p.fp, "%g %g", x, y);
+	fprintf (fp, "%g %g", x, y);
 	int k = 0;
-	for (scalar s in p.list)
-	  fprintf (p.fp, " %g", field[i][len*j + k++]);
-	fputc ('\n', p.fp);
+	for (scalar s in list)
+	  fprintf (fp, " %g", field[i][len*j + k++]);
+	fputc ('\n', fp);
       }
-      fputc ('\n', p.fp);
+      fputc ('\n', fp);
     }
-    fflush (p.fp);
+    fflush (fp);
   }
 @if _MPI
   else // slave
-    MPI_Reduce (field[0], NULL, len*p.n*ny, MPI_DOUBLE, MPI_MIN, 0,
+    MPI_Reduce (field[0], NULL, len*n*ny, MPI_DOUBLE, MPI_MIN, 0,
 		MPI_COMM_WORLD);
 @endif
 
@@ -138,45 +125,34 @@ The arguments and their default values are:
 *linear*
 : use first-order (default) or bilinear interpolation. */
 
-struct OutputMatrix {
-  scalar f;
-  FILE * fp;
-  int n;
-  bool linear;
-};
-
 trace
-void output_matrix (struct OutputMatrix p)
+void output_matrix (scalar f, FILE * fp = stdout, int n = N, bool linear = false)
 {
-  if (p.n == 0) p.n = N;
-  if (!p.fp) p.fp = stdout;
-  if (p.linear) {
-    scalar f = p.f;
+  if (linear)
     boundary ({f});
-  }
-  float fn = p.n;
+  float fn = n;
   float Delta = (float) L0/fn;
-  fwrite (&fn, sizeof(float), 1, p.fp);
-  for (int j = 0; j < p.n; j++) {
+  fwrite (&fn, sizeof(float), 1, fp);
+  for (int j = 0; j < n; j++) {
     float yp = (float) (Delta*j + X0 + Delta/2.);
-    fwrite (&yp, sizeof(float), 1, p.fp);
+    fwrite (&yp, sizeof(float), 1, fp);
   }
-  for (int i = 0; i < p.n; i++) {
+  for (int i = 0; i < n; i++) {
     float xp = (float) (Delta*i + X0 + Delta/2.);
-    fwrite (&xp, sizeof(float), 1, p.fp);
-    for (int j = 0; j < p.n; j++) {
+    fwrite (&xp, sizeof(float), 1, fp);
+    for (int j = 0; j < n; j++) {
       float yp = (float)(Delta*j + Y0 + Delta/2.), v;
-      if (p.linear)
-	v = interpolate (p.f, xp, yp);
+      if (linear)
+	v = interpolate (f, xp, yp);
       else {
 	Point point = locate (xp, yp);
 	assert (point.level >= 0);
-	v = val(p.f);
+	v = f[];
       }
-      fwrite (&v, sizeof(float), 1, p.fp);
+      fwrite (&v, sizeof(float), 1, fp);
     }
   }
-  fflush (p.fp);
+  fflush (fp);
 }
 
 /**
@@ -186,7 +162,7 @@ Colormaps are arrays of (127) red, green, blue triplets. */
 
 #define NCMAP 127
 
-typedef void (* colormap) (double cmap[NCMAP][3]);
+typedef void (* Colormap) (double cmap[NCMAP][3]);
 
 void jet (double cmap[NCMAP][3])
 {
@@ -296,12 +272,12 @@ returns the red/green/blue triplet corresponding to *val*. */
 
 typedef struct {
   unsigned char r, g, b;
-} color;
+} Color;
 
-color colormap_color (double cmap[NCMAP][3], 
+Color colormap_color (double cmap[NCMAP][3], 
 		      double val, double min, double max)
 {
-  color c;
+  Color c;
   if (val == nodata) {
     c.r = c.g = c.b = 0; // nodata is black
     return c;
@@ -318,7 +294,7 @@ color colormap_color (double cmap[NCMAP][3],
     i = val*(NCMAP - 1);
     coef = val*(NCMAP - 1) - i;
   }
-  assert (i < NCMAP - 1);
+  assert (i >= 0 && i < NCMAP - 1);
   unsigned char * c1 = (unsigned char *) &c;
   for (int j = 0; j < 3; j++)
     c1[j] = 255*(cmap[i][j]*(1. - coef) + cmap[i + 1][j]*coef);
@@ -548,6 +524,9 @@ of the field minus (resp. plus) *spread* times the standard deviation.
 By default *spread* is five. If negative, the minimum and maximum
 values of the field are used.
 
+*z*
+: the z-coordinate (in 3D) of the plane being represented.
+
 *linear*
 : whether to use bilinear or first-order interpolation. Default is 
 first-order.
@@ -568,109 +547,97 @@ of the domain for which *mask* is negative.
 with *file*).
 */
 
-struct OutputPPM {
-  scalar f;
-  FILE * fp;
-  int n;
-  char * file;
-  double min, max, spread, z;
-  bool linear;
-  double box[2][2];
-  scalar mask;
-  colormap map;
-  char * opt;
-};
-
 trace
-void output_ppm (struct OutputPPM p)
+void output_ppm (scalar f,
+		 FILE * fp = stdout,
+		 int n = N,
+		 char * file = NULL,
+		 double min = 0, double max = 0, double spread = 5,
+		 double z = 0,
+		 bool linear = false,
+		 double box[2][2] = {{X0, Y0}, {X0 + L0, Y0 + L0}},
+		 scalar mask = {-1},
+		 Colormap map = jet,
+		 char * opt = NULL)
 {
   // default values
-  if (p.n == 0) p.n = N;
-  if (p.min == 0 && p.max == 0) {
-    stats s = statsf (p.f);
-    if (p.spread < 0.)
-      p.min = s.min, p.max = s.max;
+  if (!min && !max) {
+    stats s = statsf (f);
+    if (spread < 0.)
+      min = s.min, max = s.max;
     else {
-      double avg = s.sum/s.volume, spread = (p.spread ? p.spread : 5.)*s.stddev;
-      p.min = avg - spread; p.max = avg + spread;
+      double avg = s.sum/s.volume;
+      min = avg - spread*s.stddev; max = avg + spread*s.stddev;
     }
   }
-  if (p.box[0][0] == 0. && p.box[0][1] == 0. && 
-      p.box[1][0] == 0. && p.box[1][1] == 0.) {
-    p.box[0][0] = X0;      p.box[0][1] = Y0;
-    p.box[1][0] = X0 + L0; p.box[1][1] = Y0 + L0;
-  }
-  if (!p.map)
-    p.map = jet;
-  if (p.linear) {
-    scalar f = p.f, mask = p.mask;
-    if (mask.i)
+  if (linear) {
+    scalar f = f, mask = mask;
+    if (mask.i >= 0)
       boundary ({f, mask});
     else
       boundary ({f});
   }
   
-  double fn = p.n;
-  double Delta = (p.box[1][0] - p.box[0][0])/fn;
-  int ny = (p.box[1][1] - p.box[0][1])/Delta;
+  double fn = n;
+  double Delta = (box[1][0] - box[0][0])/fn;
+  int ny = (box[1][1] - box[0][1])/Delta;
   if (ny % 2) ny++;
   
-  color ** ppm = (color **) matrix_new (ny, p.n, sizeof(color));
+  Color ** ppm = (Color **) matrix_new (ny, n, sizeof(Color));
   double cmap[NCMAP][3];
-  p.map (cmap);
+  (* map) (cmap);
   OMP_PARALLEL() {
     OMP(omp for schedule(static))
       for (int j = 0; j < ny; j++) {
-	double yp = Delta*j + p.box[0][1] + Delta/2.;
-	for (int i = 0; i < p.n; i++) {
-	  double xp = Delta*i + p.box[0][0] + Delta/2., v;
-	  if (p.mask.i) { // masking
-	    if (p.linear) {
-	      double m = interpolate (p.mask, xp, yp, p.z);
+	double yp = Delta*j + box[0][1] + Delta/2.;
+	for (int i = 0; i < n; i++) {
+	  double xp = Delta*i + box[0][0] + Delta/2., v;
+	  if (mask.i >= 0) { // masking
+	    if (linear) {
+	      double m = interpolate (mask, xp, yp, z);
 	      if (m < 0.)
 		v = nodata;
 	      else
-		v = interpolate (p.f, xp, yp, p.z);
+		v = interpolate (f, xp, yp, z);
 	    }
 	    else {
-	      Point point = locate (xp, yp, p.z);
-	      if (point.level < 0 || val(p.mask) < 0.)
+	      Point point = locate (xp, yp, z);
+	      if (point.level < 0 || mask[] < 0.)
 		v = nodata;
 	      else
-		v = val(p.f);
+		v = f[];
 	    }
 	  }
-	  else if (p.linear)
-	    v = interpolate (p.f, xp, yp, p.z);
+	  else if (linear)
+	    v = interpolate (f, xp, yp, z);
 	  else {
-	    Point point = locate (xp, yp, p.z);
-	    v = point.level >= 0 ? val(p.f) : nodata;
+	    Point point = locate (xp, yp, z);
+	    v = point.level >= 0 ? f[] : nodata;
 	  }
-	  ppm[ny - 1 - j][i] = colormap_color (cmap, v, p.min, p.max);
+	  ppm[ny - 1 - j][i] = colormap_color (cmap, v, min, max);
 	}
       }
   }
   
   if (pid() == 0) { // master
 @if _MPI
-    MPI_Reduce (MPI_IN_PLACE, ppm[0], 3*ny*p.n, MPI_UNSIGNED_CHAR, MPI_MAX, 0,
+    MPI_Reduce (MPI_IN_PLACE, ppm[0], 3*ny*n, MPI_UNSIGNED_CHAR, MPI_MAX, 0,
 		MPI_COMM_WORLD);
 @endif
-    if (!p.fp) p.fp = stdout;
-    if (p.file)
-      p.fp = open_image (p.file, p.opt);
+    if (file)
+      fp = open_image (file, opt);
     
-    fprintf (p.fp, "P6\n%u %u 255\n", p.n, ny);
-    fwrite (((void **) ppm)[0], sizeof(color), ny*p.n, p.fp);
+    fprintf (fp, "P6\n%u %u 255\n", n, ny);
+    fwrite (((void **) ppm)[0], sizeof(Color), ny*n, fp);
     
-    if (p.file)
-      close_image (p.file, p.fp);
+    if (file)
+      close_image (file, fp);
     else
-      fflush (p.fp);
+      fflush (fp);
   }
 @if _MPI
   else // slave
-    MPI_Reduce (ppm[0], NULL, 3*ny*p.n, MPI_UNSIGNED_CHAR, MPI_MAX, 0,
+    MPI_Reduce (ppm[0], NULL, 3*ny*n, MPI_UNSIGNED_CHAR, MPI_MAX, 0,
 		MPI_COMM_WORLD);
 @endif
     
@@ -693,7 +660,7 @@ The arguments and their default values are:
 : a file pointer. Default is stdout.
 
 $\Delta$
-: size of a grid element. Default is 1/N.
+: size of a grid element. Default is L0/N.
 
 *linear*
 : whether to use bilinear or first-order interpolation. Default is 
@@ -707,82 +674,68 @@ first-order.
 : if set, this field will be used to mask out, the regions 
 of the domain for which *mask* is negative. */
 
-struct OutputGRD {
-  scalar f;
-  FILE * fp;
-  double Delta;
-  bool linear;
-  double box[2][2];
-  scalar mask;
-};
-
 trace
-void output_grd (struct OutputGRD p)
+void output_grd (scalar f,
+		 FILE * fp = stdout,
+		 double Delta = L0/N,
+		 bool linear = false,
+		 double box[2][2] = {{X0, Y0}, {X0 + L0, Y0 + L0}},
+		 scalar mask = {-1})
 {
-  // default values
-  if (!p.fp) p.fp = stdout;
-  if (p.box[0][0] == 0. && p.box[0][1] == 0. && 
-      p.box[1][0] == 0. && p.box[1][1] == 0.) {
-    p.box[0][0] = X0;      p.box[0][1] = Y0;
-    p.box[1][0] = X0 + L0; p.box[1][1] = Y0 + L0;
-    if (p.Delta == 0) p.Delta = L0/N;
-  }
-  if (p.linear) {
-    scalar f = p.f, mask = p.mask;
-    if (mask.i)
+  if (linear) {
+    if (mask.i >= 0)
       boundary ({f, mask});
     else
       boundary ({f});
   }
 
-  double Delta = p.Delta;
-  int nx = (p.box[1][0] - p.box[0][0])/Delta;
-  int ny = (p.box[1][1] - p.box[0][1])/Delta;
+  int nx = (box[1][0] - box[0][0])/Delta;
+  int ny = (box[1][1] - box[0][1])/Delta;
 
   // header
-  fprintf (p.fp, "ncols          %d\n", nx);
-  fprintf (p.fp, "nrows          %d\n", ny);
-  fprintf (p.fp, "xllcorner      %g\n", p.box[0][0]);
-  fprintf (p.fp, "yllcorner      %g\n", p.box[0][1]);
-  fprintf (p.fp, "cellsize       %g\n", Delta);
-  fprintf (p.fp, "nodata_value   -9999\n");
+  fprintf (fp, "ncols          %d\n", nx);
+  fprintf (fp, "nrows          %d\n", ny);
+  fprintf (fp, "xllcorner      %g\n", box[0][0]);
+  fprintf (fp, "yllcorner      %g\n", box[0][1]);
+  fprintf (fp, "cellsize       %g\n", Delta);
+  fprintf (fp, "nodata_value   -9999\n");
   
   // data
   for (int j = ny-1; j >= 0; j--) {
-    double yp = Delta*j + p.box[0][1] + Delta/2.;
+    double yp = Delta*j + box[0][1] + Delta/2.;
     for (int i = 0; i < nx; i++) {
-      double xp = Delta*i + p.box[0][0] + Delta/2., v;
-      if (p.mask.i) { // masking
-	if (p.linear) {
-	  double m = interpolate (p.mask, xp, yp);
+      double xp = Delta*i + box[0][0] + Delta/2., v;
+      if (mask.i >= 0) { // masking
+	if (linear) {
+	  double m = interpolate (mask, xp, yp);
 	  if (m < 0.)
 	    v = nodata;
 	  else
-	    v = interpolate (p.f, xp, yp);
+	    v = interpolate (f, xp, yp);
 	}
 	else {
 	  Point point = locate (xp, yp);
-	  if (point.level < 0 || val(p.mask) < 0.)
+	  if (point.level < 0 || mask[] < 0.)
 	    v = nodata;
 	  else
-	    v = val(p.f);
+	    v = f[];
 	}
       }
-      else if (p.linear)
-	v = interpolate (p.f, xp, yp);
+      else if (linear)
+	v = interpolate (f, xp, yp);
       else {
 	Point point = locate (xp, yp);
-	v = point.level >= 0 ? val(p.f) : nodata;
+	v = point.level >= 0 ? f[] : nodata;
       }
       if (v == nodata)
-	fprintf (p.fp, "-9999 ");
+	fprintf (fp, "-9999 ");
       else
-	fprintf (p.fp, "%f ", v);
+	fprintf (fp, "%f ", v);
     }
-    fprintf (p.fp, "\n");
+    fprintf (fp, "\n");
   }
 
-  fflush (p.fp);
+  fflush (fp);
 }
 
 #if MULTIGRID
@@ -791,13 +744,13 @@ void output_grd (struct OutputGRD p)
 ## *output_gfs()*: Gerris simulation format
 
 The function writes simulation data in the format used in
-[Gerris](http://gfs.sf.net) simulation files. These files can be read
-with GfsView.
+[Gerris](http://gerris.dalembert.upmc.fr) simulation files. These
+files can be read with GfsView.
 
 The arguments and their default values are:
 
 *fp*
-: a file pointer. Default is *name* or stdout.
+: a file pointer. Default is stdout or *file*.
 
 *list*
 : a list of scalar fields to write. Default is *all*. 
@@ -809,14 +762,6 @@ The arguments and their default values are:
 : whether to replace "well-known" Basilisk variables with their Gerris
 equivalents.
 */
-
-struct OutputGfs {
-  FILE * fp;
-  scalar * list;
-  double t; // fixme: obsolete
-  char * file;
-  bool translate;
-};
 
 static char * replace (const char * input, int target, int with,
 		       bool translate)
@@ -839,29 +784,32 @@ static char * replace (const char * input, int target, int with,
 }
 
 trace
-void output_gfs (struct OutputGfs p)
+void output_gfs (FILE * fp = NULL,
+		 scalar * list = NULL,
+		 char * file = NULL,
+		 bool translate = false)
 {
-  char * fname = p.file;
+  char * fname = file;
   
 @if _MPI
 #if MULTIGRID_MPI
   not_mpi_compatible();
 #endif // !MULTIGRID_MPI
-  FILE * fp = p.fp;
-  if (p.file == NULL) {
+  FILE * sfp = fp;
+  if (file == NULL) {
     long pid = getpid();
     MPI_Bcast (&pid, 1, MPI_LONG, 0, MPI_COMM_WORLD);
     fname = qmalloc (80, char);
     snprintf (fname, 80, ".output-%ld", pid);
-    p.fp = NULL;
+    fp = NULL;
   }
 @endif // _MPI
   
   bool opened = false;
-  if (p.fp == NULL) {
+  if (fp == NULL) {
     if (fname == NULL)
-      p.fp = stdout;
-    else if (!(p.fp = fopen (fname, "w"))) {
+      fp = stdout;
+    else if (!(fp = fopen (fname, "w"))) {
       perror (fname);
       exit (1);
     }
@@ -869,47 +817,47 @@ void output_gfs (struct OutputGfs p)
       opened = true;
   }
   
-  scalar * list = p.list ? p.list : list_copy (all);
+  scalar * slist = list ? list : list_copy (all);
 
-  restriction (list);
-  fprintf (p.fp, 
+  restriction (slist);
+  fprintf (fp, 
 	   "1 0 GfsSimulation GfsBox GfsGEdge { binary = 1"
 	   " x = %g y = %g ",
 	   0.5 + X0/L0, 0.5 + Y0/L0);
 #if dimension == 3
-  fprintf (p.fp, "z = %g ", 0.5 + Z0/L0);
+  fprintf (fp, "z = %g ", 0.5 + Z0/L0);
 #endif
 
-  if (list != NULL && list[0].i != -1) {
-    scalar s = list[0];
-    char * name = replace (s.name, '.', '_', p.translate);
-    fprintf (p.fp, "variables = %s", name);
+  if (slist != NULL && slist[0].i != -1) {
+    scalar s = slist[0];
+    char * name = replace (s.name, '.', '_', translate);
+    fprintf (fp, "variables = %s", name);
     free (name);
-    for (int i = 1; i < list_len(list); i++) {
-      scalar s = list[i];
+    for (int i = 1; i < list_len(slist); i++) {
+      scalar s = slist[i];
       if (s.name) {
-	char * name = replace (s.name, '.', '_', p.translate);
-	fprintf (p.fp, ",%s", name);
+	char * name = replace (s.name, '.', '_', translate);
+	fprintf (fp, ",%s", name);
 	free (name);
       }
     }
-    fprintf (p.fp, " ");
+    fprintf (fp, " ");
   }
-  fprintf (p.fp, "} {\n");
-  fprintf (p.fp, "  Time { t = %g }\n", t);
+  fprintf (fp, "} {\n");
+  fprintf (fp, "  Time { t = %g }\n", t);
   if (L0 != 1.)
-    fprintf (p.fp, "  PhysicalParams { L = %g }\n", L0);
-  fprintf (p.fp, "  VariableTracerVOF f\n");
-  fprintf (p.fp, "}\nGfsBox { x = 0 y = 0 z = 0 } {\n");
+    fprintf (fp, "  PhysicalParams { L = %g }\n", L0);
+  fprintf (fp, "  VariableTracerVOF f\n");
+  fprintf (fp, "}\nGfsBox { x = 0 y = 0 z = 0 } {\n");
 
 @if _MPI
   long header;
-  if ((header = ftell (p.fp)) < 0) {
+  if ((header = ftell (fp)) < 0) {
     perror ("output_gfs(): error in header");
     exit (1);
   }
   int cell_size = sizeof(unsigned) + sizeof(double);
-  for (scalar s in list)
+  for (scalar s in slist)
     if (s.name)
       cell_size += sizeof(double);
   scalar index = new scalar;
@@ -924,7 +872,7 @@ void output_gfs (struct OutputGfs p)
 @endif
     {
 @if _MPI
-      if (fseek (p.fp, header + index[]*cell_size, SEEK_SET) < 0) {
+      if (fseek (fp, header + index[]*cell_size, SEEK_SET) < 0) {
 	perror ("output_gfs(): error while seeking");
 	exit (1);
       }
@@ -950,10 +898,10 @@ void output_gfs (struct OutputGfs p)
 #endif
       if (is_leaf(cell))
 	flags |= (1 << 4);
-      fwrite (&flags, sizeof (unsigned), 1, p.fp);
+      fwrite (&flags, sizeof (unsigned), 1, fp);
       double a = -1;
-      fwrite (&a, sizeof (double), 1, p.fp);
-      for (scalar s in list)
+      fwrite (&a, sizeof (double), 1, fp);
+      for (scalar s in slist)
 	if (s.name) {
 	  if (s.v.x.i >= 0) {
 	    // this is a vector component, we need to rotate from
@@ -976,7 +924,7 @@ void output_gfs (struct OutputGfs p)
 	  }
 	  else
 	    a = is_local(cell) && s[] != nodata ? s[] : (double) DBL_MAX;
-	  fwrite (&a, sizeof (double), 1, p.fp);
+	  fwrite (&a, sizeof (double), 1, fp);
 	}
     }
     if (is_leaf(cell))
@@ -985,32 +933,32 @@ void output_gfs (struct OutputGfs p)
   
 @if _MPI
   delete ({index});
-  if (!pid() && fseek (p.fp, total_size, SEEK_SET) < 0) {
+  if (!pid() && fseek (fp, total_size, SEEK_SET) < 0) {
     perror ("output_gfs(): error while finishing");
     exit (1);
   }
   if (!pid())
 @endif  
-    fputs ("}\n", p.fp);
-  fflush (p.fp);
+    fputs ("}\n", fp);
+  fflush (fp);
 
-  if (!p.list)
-    free (list);
+  if (!list)
+    free (slist);
   if (opened)
-    fclose (p.fp);
+    fclose (fp);
 
 @if _MPI
-  if (p.file == NULL) {
+  if (file == NULL) {
     MPI_Barrier (MPI_COMM_WORLD);
     if (pid() == 0) {
-      if (fp == NULL)
-	fp = stdout;
-      p.fp = fopen (fname, "r");
+      if (sfp == NULL)
+	sfp = stdout;
+      fp = fopen (fname, "r");
       size_t l;
       unsigned char buffer[8192];
-      while ((l = fread (buffer, 1, 8192, p.fp)) > 0)
-	fwrite (buffer, 1, l, fp);
-      fflush (fp);
+      while ((l = fread (buffer, 1, 8192, fp)) > 0)
+	fwrite (buffer, 1, l, sfp);
+      fflush (sfp);
       remove (fname);
     }
     free (fname);
@@ -1039,13 +987,6 @@ default is "dump".
 *unbuffered*
 : whether to use a file buffer. Default is false.
 */
-
-struct Dump {
-  char * file;
-  scalar * list;
-  FILE * fp;
-  bool unbuffered;
-};
 
 struct DumpHeader {
   double t;
@@ -1093,16 +1034,16 @@ static void dump_header (FILE * fp, struct DumpHeader * header, scalar * list)
 
 @if !_MPI
 trace
-void dump (struct Dump p)
+void dump (const char * file = "dump",
+	   scalar * list = all,
+	   FILE * fp = NULL,
+	   bool unbuffered = false)
 {
-  FILE * fp = p.fp;
-  char def[] = "dump", * file = p.file ? p.file : p.fp ? NULL : def;
-
   char * name = NULL;
-  if (file) {
+  if (!fp) {
     name = (char *) malloc (strlen(file) + 2);
     strcpy (name, file);
-    if (!p.unbuffered)
+    if (!unbuffered)
       strcat (name, "~");
     if ((fp = fopen (name, "w")) == NULL) {
       perror (name);
@@ -1111,12 +1052,12 @@ void dump (struct Dump p)
   }
   assert (fp);
   
-  scalar * dlist = dump_list (p.list ? p.list : all);
+  scalar * dlist = dump_list (list);
   scalar size[];
-  scalar * list = list_concat ({size}, dlist); free (dlist);
-  struct DumpHeader header = { t, list_len(list), iter, depth(), npe(),
+  scalar * slist = list_concat ({size}, dlist); free (dlist);
+  struct DumpHeader header = { t, list_len(slist), iter, depth(), npe(),
 			       dump_version };
-  dump_header (fp, &header, list);
+  dump_header (fp, &header, slist);
   
   subtree_size (size, false);
   
@@ -1126,7 +1067,7 @@ void dump (struct Dump p)
       perror ("dump(): error while writing flags");
       exit (1);
     }
-    for (scalar s in list)
+    for (scalar s in slist)
       if (fwrite (&s[], sizeof(double), 1, fp) < 1) {
 	perror ("dump(): error while writing scalars");
 	exit (1);
@@ -1135,21 +1076,21 @@ void dump (struct Dump p)
       continue;
   }
   
-  free (list);
+  free (slist);
   if (file) {
     fclose (fp);
-    if (!p.unbuffered)
+    if (!unbuffered)
       rename (name, file);
     free (name);
   }
 }
 @else // _MPI
 trace
-void dump (struct Dump p)
+void dump (const char * file = "dump",
+	   scalar * list = all,
+	   FILE * fp = NULL,
+	   bool unbuffered = false)
 {
-  FILE * fp = p.fp;
-  char def[] = "dump", * file = p.file ? p.file : p.fp ? NULL : def;
-
   if (fp != NULL || file == NULL) {
     fprintf (ferr, "dump(): must specify a file name when using MPI\n");
     exit(1);
@@ -1157,7 +1098,7 @@ void dump (struct Dump p)
 
   char name[strlen(file) + 2];
   strcpy (name, file);
-  if (!p.unbuffered)
+  if (!unbuffered)
     strcat (name, "~");
   FILE * fh = fopen (name, "w");
   if (fh == NULL) {
@@ -1165,10 +1106,10 @@ void dump (struct Dump p)
     exit (1);    
   }
 
-  scalar * dlist = dump_list (p.list ? p.list : all);
+  scalar * dlist = dump_list (list);
   scalar size[];
-  scalar * list = list_concat ({size}, dlist); free (dlist);
-  struct DumpHeader header = { t, list_len(list), iter, depth(), npe(),
+  scalar * slist = list_concat ({size}, dlist); free (dlist);
+  struct DumpHeader header = { t, list_len(slist), iter, depth(), npe(),
 			       dump_version };
 
 #if MULTIGRID_MPI
@@ -1178,7 +1119,7 @@ void dump (struct Dump p)
 #endif
 
   if (pid() == 0)
-    dump_header (fh, &header, list);
+    dump_header (fh, &header, slist);
   
   scalar index = {-1};
   
@@ -1186,7 +1127,7 @@ void dump (struct Dump p)
   z_indexing (index, false);
   int cell_size = sizeof(unsigned) + header.len*sizeof(double);
   int sizeofheader = sizeof(header) + 4*sizeof(double);
-  for (scalar s in list)
+  for (scalar s in slist)
     sizeofheader += sizeof(unsigned) + sizeof(char)*strlen(s.name);
   long pos = pid() ? 0 : sizeofheader;
   
@@ -1202,7 +1143,7 @@ void dump (struct Dump p)
       }
       unsigned flags = is_leaf(cell) ? leaf : 0;
       fwrite (&flags, 1, sizeof(unsigned), fh);
-      for (scalar s in list)
+      for (scalar s in slist)
 	fwrite (&s[], 1, sizeof(double), fh);
       pos += cell_size;
     }
@@ -1212,23 +1153,23 @@ void dump (struct Dump p)
 
   delete ({index});
   
-  free (list);
+  free (slist);
   fclose (fh);
-  if (!p.unbuffered && pid() == 0)
+  if (!unbuffered && pid() == 0)
     rename (name, file);
 }
 @endif // _MPI
 
 trace
-bool restore (struct Dump p)
+bool restore (const char * file = "dump",
+	      scalar * list = NULL,
+	      FILE * fp = NULL)
 {
-  FILE * fp = p.fp;
-  char * file = p.file;
-  if (file && (fp = fopen (file, "r")) == NULL)
+  if (!fp && (fp = fopen (file, "r")) == NULL)
     return false;
   assert (fp);
 
-  struct DumpHeader header;  
+  struct DumpHeader header = {0};
   if (fread (&header, sizeof(header), 1, fp) < 1) {
     fprintf (ferr, "restore(): error: expecting header\n");
     exit (1);
@@ -1261,14 +1202,14 @@ bool restore (struct Dump p)
 #endif
 #endif // multigrid
 
-  bool restore_all = (p.list == all);
-  scalar * list = dump_list (p.list ? p.list : all);
+  bool restore_all = (list == all);
+  scalar * slist = dump_list (list ? list : all);
   if (header.version == 161020) {
-    if (header.len - 1 != list_len (list)) {
+    if (header.len - 1 != list_len (slist)) {
       fprintf (ferr,
 	       "restore(): error: the list lengths don't match: "
 	       "%ld (file) != %d (code)\n",
-	       header.len - 1, list_len (list));
+	       header.len - 1, list_len (slist));
       exit (1);
     }
   }
@@ -1297,7 +1238,7 @@ bool restore (struct Dump p)
 
       if (i > 0) { // skip subtree size
 	bool found = false;
-	for (scalar s in list)
+	for (scalar s in slist)
 	  if (!strcmp (s.name, name)) {
 	    input = list_append (input, s);
 	    found = true; break;
@@ -1314,13 +1255,8 @@ bool restore (struct Dump p)
 	}
       }
     }
-    free (list);
-    list = input;
-    fprintf(ferr, "size of read restart file: %d\n", list_len(input));
-    for (scalar s in input){
-        fprintf(ferr, "s.name=%s\t", s.name);
-	}
-    fprintf(ferr, "\n");
+    free (slist);
+    slist = input;
 
     double o[4];
     if (fread (o, sizeof(double), 4, fp) < 4) {
@@ -1343,7 +1279,7 @@ bool restore (struct Dump p)
   
   scalar * listm = is_constant(cm) ? NULL : (scalar *){fm};
 #if TREE && _MPI
-  restore_mpi (fp, list);
+  restore_mpi (fp, slist);
 #else
   foreach_cell() {
     unsigned flags;
@@ -1353,7 +1289,7 @@ bool restore (struct Dump p)
     }
     // skip subtree size
     fseek (fp, sizeof(double), SEEK_CUR);
-    for (scalar s in list) {
+    for (scalar s in slist) {
       double val;
       if (fread (&val, sizeof(double), 1, fp) != 1) {
 	fprintf (ferr, "restore(): error: expecting a scalar\n");
@@ -1373,12 +1309,12 @@ bool restore (struct Dump p)
   
   scalar * other = NULL;
   for (scalar s in all)
-    if (!list_lookup (list, s) && !list_lookup (listm, s))
+    if (!list_lookup (slist, s) && !list_lookup (listm, s))
       other = list_append (other, s);
   reset (other, 0.);
   free (other);
   
-  free (list);
+  free (slist);
   if (file)
     fclose (fp);
 

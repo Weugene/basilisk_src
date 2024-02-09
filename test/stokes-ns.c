@@ -9,6 +9,13 @@ account using the "reduced gravity approach". */
 #include "two-phase.h"
 #include "navier-stokes/conserving.h"
 #include "reduced.h"
+#include "stokes.h"
+
+/**
+The wave number, fluid depth and acceleration of gravity are set to
+these values. */
+  
+double k_ = 2.*pi, h_ = 0.5, g_ = 1.;
 
 /**
 The primary parameters are the wave steepness $ak$ and the Reynolds
@@ -31,13 +38,9 @@ The density and viscosity ratios are those of air and water. */
 #define MURATIO (17.4e-6/8.9e-4)
 
 /**
-The wave number, fluid depth and acceleration of gravity are set to
-these values. *T0* is the wave period. */
+*T0* is the wave period. */
 
-#define k_  (2.*pi)
-#define h_   0.5
-#define g_   1.
-#define T0  (k_/sqrt(g_*k_))
+#define T0  (k_*L0/sqrt(g_*k_))
 
 /**
 The program takes optional arguments which are the level of
@@ -61,10 +64,10 @@ int main (int argc, char * argv[])
   Here we set the densities and viscosities corresponding to the
   parameters above. */
   
-  rho1 = 1.;
+  rho1 = 1. [0];
   rho2 = RATIO;
-  mu1 = 1.0/RE; //using wavelength as length scale
-  mu2 = 1.0/RE*MURATIO;
+  mu1 = 1./RE; //using wavelength as length scale
+  mu2 = 1./RE*MURATIO;
   G.y = -g_;
 
   /**
@@ -76,7 +79,7 @@ int main (int argc, char * argv[])
 #else
   N = 1 << LEVEL;
 #endif
-  DT = 1e-2;
+  DT = 1e-2 [0,1];
   run();
 }
 
@@ -85,8 +88,6 @@ int main (int argc, char * argv[])
 
 We either restart (if a "restart" file exists), or initialise the wave
 using the third-order Stokes wave solution. */
-
-#include "stokes.h"
 
 event init (i = 0)
 {
