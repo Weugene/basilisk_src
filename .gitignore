@@ -57,8 +57,6 @@ qcc
 Makefile.tests
 Makefile.deps
 qplot
-draw_get.h
-draw_json.h
 bview
 # ast
 grammar
