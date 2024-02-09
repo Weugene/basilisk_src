@@ -1,0 +1,7 @@
+test16.c:10: warning (interpreter): 'b' undeclared
+test16.c:10: warning (interpreter): undefined argument(s) in 'b'
+ast/interpreter/overload.h:330: warning (interpreter): characters are always defined/set
+test16.c:14: interpreter_verbosity (4): !
+test16.c:15: datasize: 34  + [/src/common.h:959: 'datasize = 0']
+/grid/cartesian-common.h:497: warning (interpreter): undefined condition 'boundary'
+/grid/cartesian-common.h:500: warning (interpreter): undefined condition 'boundary_homogeneous'
