@@ -68,11 +68,9 @@ kdtquery
 xyz2kdt
 
 # darcsit/
-codeblock.c
 codeblock
 lex.yy.c
 literate-c
-literate-c.c
 parser.tab.c
 urldecode
 pagemagic
