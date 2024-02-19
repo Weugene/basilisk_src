@@ -56,6 +56,7 @@ qcc
 *.dSYM
 Makefile.tests
 Makefile.deps
+config
 qplot
 bview
 # ast
@@ -77,5 +78,4 @@ bview.log~
 bview2D
 bview3D
 
-# dependencies
-Makefile.deps
+
