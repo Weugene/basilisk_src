@@ -72,14 +72,26 @@ typedef struct {
   int size, pscope;
 } Pointer;
 
-typedef struct {
+typedef struct _Value Value;
+
+struct _Value {
   AstTerminal n;
   Ast * type;
   Pointer data; // fixme: should just be a void *
   int size, pointer, vscope;
   int * dimension;
-  //  int flags;
-} Value;
+ 
+  /**
+  This could be used in principle to "unset" the values of array
+  members accessed with an undefined index, but this breaks some test
+  cases in a non-trivial way. The relevant test case is
+  [test26.c](). */
+  
+#if UNSET_ARRAY
+  Value * unset_array;
+  Ast * unset_member;
+#endif
+};
 
 static
 void display_value (const Value * v);
@@ -126,16 +138,6 @@ void * interpreter_get_data (const Stack * s)
 {
   return ((StackData *)stack_get_data (s))->data;
 }
-
-static AstTerminal
-  ast_int = { {sym_INT}, .start = "ast_int", .file = __FILE__, .line = __LINE__ },
-  ast_long = { {sym_LONG}, .start = "ast_long", .file = __FILE__, .line = __LINE__ },
-  ast_enum = { {sym_INT}, .start = "ast_int", .file = __FILE__, .line = __LINE__ },
-  ast_char = { {sym_CHAR}, .start = "ast_char", .file = __FILE__, .line = __LINE__ },
-  ast_void = { {sym_VOID}, .start = "ast_void", .file = __FILE__, .line = __LINE__ },
-  ast_float = { {sym_FLOAT}, .start = "ast_float", .file = __FILE__, .line = __LINE__ },
-  ast_double = { {sym_DOUBLE}, .start = "ast_double", .file = __FILE__, .line = __LINE__ },
-  ast_function = { {sym_function_definition}, .start = "ast_function", .file = __FILE__, .line = __LINE__ };
 
 typedef struct {
   int pointer, size;
@@ -212,8 +214,14 @@ bool has_flags (const Value * v)
 static inline
 Flags value_flags (const Value * v)
 {
-  return has_flags (v) ? *((Flags *)(((char *)v->data.p) + v->size - sizeof (Flags))) :
-    0;
+  if (!has_flags (v))
+    return 0;
+  Flags f = *((Flags *)(((char *)v->data.p) + v->size - sizeof (Flags)));
+#if UNSET_ARRAY
+  if (v->unset_array)
+    f |= unset;
+#endif
+  return f;
 }
 
 static inline
@@ -483,7 +491,10 @@ Value * new_value (Stack * stack, Ast * n, Ast * type, int pointer)
   value->data.start = value->data.p;
   value->data.size = size;
   value->vscope = ((StackData *)stack_get_data (stack))->scope;
-  // value->flags = 0;
+#if UNSET_ARRAY
+  value->unset_array = NULL;
+  value->unset_member = NULL;
+#endif
   return value;
 }
 
@@ -580,6 +591,100 @@ double value_double (Value * v, bool * error, Stack * stack)
   return 0;
 }
 
+static inline
+int array_dimension (const Value * array, int * index)
+{
+  int nd = 0;
+  if (array->dimension)
+    for (int * i = array->dimension + 1; *i >= 0; i++)
+      *index *= *i, nd++;
+  return nd;
+}
+
+static
+Value * array_member_value (Ast * n, Value * array, int index, int unset, Stack * stack)
+{
+  if (!array) return NULL;
+  if (!array->pointer)
+    return message (NULL, (Ast *) array, "'%s' is not a pointer\n", error_verbosity, stack);
+  Value * value;
+  char * data = value_data (array, void *);
+  if (!data) {
+#if 0    
+    if (stack_verbosity (stack) >= warning_verbosity)
+      fprintf (stderr, "data: %p \n", data);
+#endif
+    return message (NULL, n, "unallocated array access in '%s'\n", warning_verbosity, stack);
+  }
+  int nd = array_dimension (array, &index);
+  value = new_value (stack, n, array->type, array->pointer - 1);
+#if UNSET_ARRAY
+  if (unset == true)
+    value->unset_array = array;
+#endif
+  Pointer p = value_data (array, Pointer);
+  value->vscope = p.pscope;
+#if 0
+  if (stack_verbosity (stack) > 1) {
+    display_value (array);
+  }
+#endif
+  if (nd) {
+    assert (value->pointer);
+    value_data (value, Pointer) = p;
+    data += index*type_size (array->pointer - nd - 1, array->type, stack);
+    value_data (value, void *) = data;
+  }
+  else {
+    data += index*value->size;
+    value->data.p = data;
+    value->data.start = p.start;
+    value->data.size = p.size;
+    if (p.start && // fixme: p.start should always be defined
+	(data < p.start || data + value->size > p.start + p.size)) {
+#if 0      
+      fprintf (stderr, "data: %p, p.start: %p, p.size: %d\n", data, p.start, p.size);
+      display_value (array);
+      display_value (value);
+#endif
+      if (unset == 2)
+	return NULL;
+      else if (!unset)
+	return message (NULL, n, data < p.start ?
+			"array index underflow in '%s'\n" :
+			"array index overflow in '%s'\n", error_verbosity, stack);	
+      else {
+
+	/**
+	If the index is unset and there is an underflow or overflow, we
+	return the first element of the array. */
+
+	data -= index*value->size;
+	if (data < p.start || data + value->size > p.start + p.size)
+	  return message (NULL, n, data < p.start ?
+			  "array index underflow in '%s'\n" :
+			  "array index overflow in '%s'\n", error_verbosity, stack);	
+	else
+	  value->data.p = data;
+      }
+    }
+  }
+#if 0
+  if (stack_verbosity (stack) >= warning_verbosity) {
+    fprintf (stderr, "==== array member value ====\n");
+    display_value (array);
+    fprintf (stderr, "%p %d %d\n", data, index, value->size);
+    display_value (value);
+    fprintf (stderr, "==== end array member value ====\n");
+  }
+#endif
+  if (array->dimension)
+    value->dimension = *(array->dimension + 1) >= 0 ? array->dimension + 1 : NULL;
+  if (value_flags (array) & unset)
+    unset_value (value, stack);
+  return value;
+}
+
 static
 Value * assign (Ast * n, Value * dst, Value * src, Stack * stack)
 {
@@ -647,89 +752,20 @@ Value * assign (Ast * n, Value * dst, Value * src, Stack * stack)
     return message (NULL, n, "assignment between incompatible types\n", error_verbosity, stack);
   if (!(value_flags (src) & unset))
     value_unset_flags (dst, unset);
-  value_unset_flags (dst, constant_expression);
-  return ast_assign_hook ? ast_assign_hook (n, dst, src, stack) : dst;
-}
-
-static
-Value * array_member_value (Ast * n, Value * array, int index, bool unset, Stack * stack)
-{
-  if (!array) return NULL;
-  if (!array->pointer)
-    return message (NULL, (Ast *) array, "'%s' is not a pointer\n", error_verbosity, stack);
-  Value * value;
-  char * data = value_data (array, void *);
-  if (!data) {
-#if 0    
-    if (stack_verbosity (stack) >= warning_verbosity)
-      fprintf (stderr, "data: %p \n", data);
-#endif
-    return message (NULL, n, "unallocated array access in '%s'\n", warning_verbosity, stack);
-  }
-  int nd = 0;
-  if (array->dimension)
-    for (int * i = array->dimension + 1; *i >= 0; i++)
-      index *= *i, nd++;
-  value = new_value (stack, n, array->type, array->pointer - 1);
-  Pointer p = value_data (array, Pointer);
-  value->vscope = p.pscope;
-#if 0
-  if (stack_verbosity (stack) > 1) {
-    display_value (array);
-  }
-#endif
-  if (nd) {
-    assert (value->pointer);
-    value_data (value, Pointer) = p;
-    data += index*type_size (array->pointer - nd - 1, array->type, stack);
-    value_data (value, void *) = data;
-  }
-  else {
-    data += index*value->size;
-    value->data.p = data;
-    value->data.start = p.start;
-    value->data.size = p.size;
-    if (p.start && // fixme: p.start should always be defined
-	(data < p.start || data + value->size > p.start + p.size)) {
-#if 0      
-      fprintf (stderr, "data: %p, p.start: %p, p.size: %d\n", data, p.start, p.size);
-      display_value (array);
-      display_value (value);
-#endif
-      if (!unset)
-	return message (NULL, n, data < p.start ?
-			"array index underflow in '%s'\n" :
-			"array index overflow in '%s'\n", error_verbosity, stack);	
-      else {
-
-	/**
-	If the index is unset and there is an underflow or overflow, we
-	return the first element of the array. */
-
-	data -= index*value->size;
-	if (data < p.start || data + value->size > p.start + p.size)
-	  return message (NULL, n, data < p.start ?
-			  "array index underflow in '%s'\n" :
-			  "array index overflow in '%s'\n", error_verbosity, stack);	
-	else
-	  value->data.p = data;
-      }
+#if UNSET_ARRAY
+  int a = 0;
+  if (dst->unset_array && !array_dimension (dst->unset_array, &a)) {
+    int index = 0;
+    Value * v;
+    while ((v = array_member_value ((Ast *)dst->unset_array, dst->unset_array, index++, 2, stack))) {
+      if (dst->unset_member)
+	v = struct_member_value ((Ast *)v, v, dst->unset_member, -1, stack);
+      unset_value (v, stack);
     }
   }
-#if 0
-  if (stack_verbosity (stack) >= warning_verbosity) {
-    fprintf (stderr, "==== array member value ====\n");
-    display_value (array);
-    fprintf (stderr, "%p %d %d\n", data, index, value->size);
-    display_value (value);
-    fprintf (stderr, "==== end array member value ====\n");
-  }
 #endif
-  if (array->dimension)
-    value->dimension = *(array->dimension + 1) >= 0 ? array->dimension + 1 : NULL;
-  if (value_flags (array) & unset)
-    unset_value (value, stack);
-  return value;
+  value_unset_flags (dst, constant_expression);
+  return ast_assign_hook ? ast_assign_hook (n, dst, src, stack) : src;
 }
 
 static
@@ -1425,6 +1461,11 @@ Ast * identifier_type (Ast * n, Dimensions * d, Stack * stack)
       return NULL;
     type = ast_child (type, sym_generic_identifier)->child[0];
   }
+  
+  if (n->sym == sym_IDENTIFIER && type->sym == sym_IDENTIFIER &&
+      !strcmp (ast_terminal (n)->start, ast_terminal (type)->start))
+    // type and identifier are identical e.g. 'typedef struct Foo Foo;'
+    return type;
 
   return base_type (type, d, stack);
 }
@@ -1471,6 +1512,8 @@ Ast * struct_size (Ast * type,
   Ast * list = ast_child (type, sym_struct_declaration_list);
   while (!list) {
     type = base_type (ast_child (type, sym_generic_identifier)->child[0], d, stack);
+    if (!type)
+      return NULL;
     assert (type->sym == sym_struct_or_union_specifier);
     list = ast_child (type, sym_struct_declaration_list);
   }
@@ -1569,7 +1612,12 @@ Value * struct_member_value (Ast * n, Value * value, Ast * member, int index, St
     }
     assert (((char *)v->data.p) + v->size <= v->data.start + v->data.size);
   }
-
+#if UNSET_ARRAY
+  if (value->unset_array) {
+    v->unset_array = value->unset_array;
+    v->unset_member = member;
+  }
+#endif
   Ast * attributes;
   if (v->vscope == 0 && member && (value_flags (v) & unset) &&
       (attributes = ast_schema (ast_parent (value->type, sym_declaration), sym_declaration,
@@ -1781,7 +1829,7 @@ Value * value_from_type (Ast * n, Ast * type, Dimensions * d, Ast * initializer,
       Ast * enumerator = ast_parent (n, sym_enumerator);
       Ast * constant = ast_child (enumerator, sym_constant_expression);
       if (constant)
-	v = assign (n, v, run (constant, stack), stack);
+	assign (n, v, run (constant, stack), stack);
       else {
 	Ast * previous = ast_child (ast_child (ast_ancestor (enumerator, 1), sym_enumerator_list),
 				    sym_enumerator);
@@ -1965,6 +2013,7 @@ Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, boo
       value_set_flags (value, unset);
     else {
       long size = value_data (params[0], long);
+      if (size < 0) size = 0;
       value_data (value, void *) = memset (pmalloc (static_calloc (1, sizeof(pmdata) + size, stack), size), 0, size);
       value_data (value, Pointer).start = value_data (value, void *);
       value_data (value, Pointer).size = size;
@@ -1982,6 +2031,7 @@ Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, boo
     else {
       long nmemb = value_data (params[0], long);
       long size = value_data (params[1], long);
+      if (size < 0) size = 0;
       value_data (value, void *) = memset (pmalloc (static_malloc (sizeof(pmdata) + nmemb*size, stack), nmemb*size),
 					   0, nmemb*size);
       value_data (value, Pointer).start = value_data (value, void *);
@@ -2004,6 +2054,7 @@ Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, boo
       value_set_flags (value, unset);
     else {
       long size = value_data (params[1], long);
+      if (size < 0) size = 0;
       value_data (value, void *) = pmalloc (static_realloc (pfree (ptr, call, stack), sizeof (pmdata) + size, stack), size);
       long oldsize = value_data (params[0], Pointer).size;
       if (size > oldsize)
@@ -2661,8 +2712,6 @@ Value * ast_run_node (Ast * n, Stack * stack)
 	  return message (scope, n->child[2], "undefined array index '%s'\n", warning_verbosity, stack);
 #endif
 	value = array_member_value (n, a, index, value_flags (i) & unset, stack);
-	if (value && (value_flags (i) & unset))
-	  unset_value (value, stack);
       }
       else
 	return message (scope, n, "inconsistent array access '%s'\n", error_verbosity, stack);

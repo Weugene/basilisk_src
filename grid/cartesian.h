@@ -126,12 +126,6 @@ void reset (void * alist, double val)
 			 point.j < GHOSTS || point.j >= point.n + GHOSTS)
 @
 
-@def foreach_boundary(b)
-  foreach_boundary_dir (depth(), b)
-    if (!is_boundary(point)) {
-@
-@define end_foreach_boundary() } end_foreach_boundary_dir()
-
 // ghost cell coordinates for each direction
 static int _ig[] = {1,-1,0,0}, _jg[] = {0,0,1,-1};
 
@@ -185,6 +179,15 @@ static void box_boundary_level_tangent (const Boundary * b,
   }
 }
 
+@def foreach_boundary(b)
+  if (default_scalar_bc[b] != periodic_bc)
+    foreach_boundary_dir (depth(), b)
+      if (!is_boundary(point)) {
+@
+@define end_foreach_boundary() } end_foreach_boundary_dir()
+
+static double periodic_bc (Point point, Point neighbor, scalar s, void * data);
+
 static void box_boundary_level (const Boundary * b, scalar * list, int l)
 {
   int d = ((BoxBoundary *)b)->d;
@@ -196,16 +199,16 @@ static void box_boundary_level (const Boundary * b, scalar * list, int l)
       if (s.face) {
 	if ((&s.d.x)[component]) {
 	  scalar b = s.v.x;
-	  if (b.boundary[d])
+	  if (b.boundary[d] && b.boundary[d] != periodic_bc)
 	    normal = list_add (normal, s);
 	}
 	else {
 	  scalar b = s.v.y;
-	  if (b.boundary[d])
+	  if (b.boundary[d] && b.boundary[d] != periodic_bc)
 	    tangent = list_add (tangent, s);
 	}
       }	
-      else if (s.boundary[d])
+      else if (s.boundary[d] && s.boundary[d] != periodic_bc)
 	centered = list_add (centered, s);
     }
 
@@ -238,6 +241,50 @@ static void box_boundary_level (const Boundary * b, scalar * list, int l)
   free (tangent);
 }
 
+/* Periodic boundaries */
+
+#if !_MPI
+  
+@define VT _attribute[s.i].v.y
+
+foreach_dimension()
+static void periodic_boundary_level_x (const Boundary * b, scalar * list, int l)
+{
+  scalar * list1 = NULL;
+  for (scalar s in list)
+    if (!is_constant(s) && s.block > 0) {
+      if (s.face) {
+	scalar vt = VT;
+	if (vt.boundary[right] == periodic_bc)
+	  list1 = list_add (list1, s);
+      }
+      else if (s.boundary[right] == periodic_bc)
+	list1 = list_add (list1, s);
+    }
+  if (!list1)
+    return;
+
+  OMP_PARALLEL() {
+    Point point = {0};
+    point.n = cartesian->n;
+    int j;
+    OMP(omp for schedule(static))
+      for (j = 0; j < point.n + 2*GHOSTS; j++) {
+	for (int i = 0; i < GHOSTS; i++)
+	  for (scalar s in list1)
+	    memcpy (&s[i,j], &s[i + point.n,j], s.block*sizeof(double));
+	for (int i = point.n + GHOSTS; i < point.n + 2*GHOSTS; i++)
+	  for (scalar s in list1)
+	    memcpy (&s[i,j], &s[i - point.n,j], s.block*sizeof(double));
+      }
+  }
+  free (list1);
+}
+
+@undef VT
+  
+#endif // !_MPI
+
 void free_grid (void)
 {
   if (!grid)
@@ -269,6 +316,12 @@ void init_grid (int n)
     box->d = d;
     Boundary * b = (Boundary *) box;
     b->level   = box_boundary_level;
+    add_boundary (b);
+  }
+  // periodic boundaries
+  foreach_dimension() {
+    Boundary * b = qcalloc (1, Boundary);
+    b->level = periodic_boundary_level_x;
     add_boundary (b);
   }
   // mesh size

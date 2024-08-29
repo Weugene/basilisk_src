@@ -19,7 +19,7 @@ accesses). */
 #include "symbols.h"
 
 #if 0 // for debugging
-# define CHECK(x) ast_check_grammar(x, true)
+# define CHECK(x) ast_check_grammar(x, true, false)
 #else
 # define CHECK(x) (x)
 #endif
@@ -35,11 +35,10 @@ bool ast_is_stencil_function (Ast * n)
 
 static bool is_scalar (Ast * n, Stack * stack)
 {
-  const char * typename =
-    ast_typedef_name (ast_expression_type (n, stack, true));
-  return (typename &&
-	  (!strcmp (typename, "scalar") ||
-	   !strcmp (typename, "vertex scalar")));    
+  const char * typename = ast_typedef_name (ast_expression_type (n, stack, true));  
+  return typename &&
+    (!strcmp (typename, "scalar") || !strcmp (typename, "vertex scalar")) &&
+    !ast_constant_postfix_expression (n, stack);
 }
 
 static Ast * is_point_function_call (Ast * n)
@@ -240,15 +239,29 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
 	ast_erase (n);
       break;
 
-    /**
-    Remove values from return statements in point functions. */
-
     case sym_jump_statement:
-      if (n->child[0]->sym == sym_RETURN && n->child[2] &&
-	  scope->sym == sym_function_definition) {
-	ast_erase (n->child[1]);
-	n->child[1] = n->child[2];
-	n->child[2] = NULL;
+      if (n->child[0]->sym == sym_RETURN) {
+	if (scope->sym == sym_foreach_statement) {
+	  fprintf (stderr, "%s:%d: error: cannot return from a foreach() loop\n",
+		   ast_terminal (n->child[0])->file,
+		   ast_terminal (n->child[0])->line);
+	  exit (1);
+	}
+	
+	/**
+	Remove return from compound statements. */
+
+	else if (scope->sym == sym_compound_statement)
+	  ast_erase (n);
+	
+	/**
+	Remove values from return statements in point functions. */
+
+	else if (n->child[2] && scope->sym == sym_function_definition) {
+	    ast_erase (n->child[1]);
+	    n->child[1] = n->child[2];
+	    n->child[2] = NULL;
+	  }
       }
       break;
 
@@ -348,7 +361,6 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
 
   case sym_forin_declaration_statement:
   case sym_foreach_inner_statement:
-    assert (!ast_child (n, sym_statement));
     ast_erase (n);
     break;
     
@@ -463,6 +475,9 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
     return;
 
   case sym_foreach_statement:
+    ast_erase (n);
+    return;
+    
   case sym_function_definition:
     // keep incomplete function definitions and foreach statements
     return;
@@ -485,6 +500,15 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
     /**
     Same as above for incomplete assignments. */
     
+    break;
+
+  case sym_macro_statement:
+    if (n->child[0] == ast_placeholder) {
+      Ast * statement = ast_ancestor (n, 2);
+      ast_set_child (statement, 0, n->child[1]);
+    }
+    else
+      assert (false);
     break;
     
   default:
@@ -550,15 +574,40 @@ typedef struct {
   Ast * scope;
   bool parallel, overflow, nowarning;
   bool undefined;
+  int index;
 } Undefined;
 
 /**
 Move field accesses into their own expression statement, before their
 parent statement or declaration. */
 
-void move_field_accesses (Ast * n, Stack * stack, void * data)
+void move_field_accesses (Ast * n, Stack * stack, Undefined * u)
 {
-  Undefined * u = data;
+  if (n == ast_placeholder)
+    return;
+  
+  Ast * scope = ast_push_declarations (n, stack);
+
+  switch (n->sym) {
+
+  case sym_assignment_expression: {
+    /**
+    In assignment expressions the right-hand-side must be evaluated
+    before the left-hand-side. */
+    
+    Ast ** c;
+    for (c = n->child; *c; c++);
+    for (c--; c >= n->child; c--)
+      move_field_accesses (*c, stack, u);
+    break;
+  }
+
+  default:
+    if (n->child)
+      for (Ast ** c = n->child; *c; c++)
+	move_field_accesses (*c, stack, u);
+  }
+
   if (is_field_access (n, stack)) {
     Ast * parent = n->parent;
     while (parent &&
@@ -588,6 +637,8 @@ void move_field_accesses (Ast * n, Stack * stack, void * data)
   }
   else
     ast_cleanup (n, stack, u->scope, false);
+  
+  ast_pop_scope (stack, scope);
 }
 
 /**
@@ -663,6 +714,7 @@ void undefined_iterators (Ast * n, Stack * stack, void * data)
 
 static Ast * is_undefined_parameter (const Ast * n)
 {
+  if (n->sym == sym_IDENTIFIER) n = ast_parent (n, sym_parameter_declaration);
   Ast * identifier;
   if ((identifier = ast_schema (n, sym_parameter_declaration,
 				0, sym_declaration_specifiers,
@@ -729,7 +781,7 @@ void check_missing_reductions (Ast * n, Stack * stack, Ast * scope)
 	     "%s:%d: error: or a serial loop to get rid of this error\n",
 	     t->file, t->line, ast_terminal (n)->start,
 	     t->file, t->line, t->file, t->line);
-  else {
+  else if (scope->sym == sym_function_definition) {
     AstTerminal * f = ast_left_terminal (calling_foreach (stack));
     fprintf (stderr,
 	     "%s:%d: error: non-local variable '%s' is modified by this "
@@ -740,6 +792,8 @@ void check_missing_reductions (Ast * n, Stack * stack, Ast * scope)
 	     t->file, t->line,
 	     f->file, f->line);
   }
+  else
+    assert (false);
   exit (1);
 }
 
@@ -765,18 +819,22 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
   switch (n->sym) {
 
   case sym_IDENTIFIER: {
+
+    /**
+    Variable "point" is always defined. */
+    
+    if (!strcmp (ast_terminal (n)->start, "point"))
+      break;
+    
     Ast * ref = ast_identifier_declaration (stack, ast_terminal (n)->start);
-    if (ref && is_point_variable (ref))
+    if (ref && (is_point_variable (ref) || is_undefined_parameter (ref)))
       ref = NULL;
     
     /**
     Reset state when the variable is declared. */
     
     if (ref == n) {
-      if (is_undefined_parameter (ast_parent (n, sym_parameter_declaration)))
-	set_undefined (ref, undef->scope);
-      else
-	set_undefined (ref, NULL);
+      set_undefined (ref, NULL);
       break;
     }
 
@@ -796,7 +854,27 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
       undef->undefined = true;
       return;
     }
-    
+
+    /**
+    Check for global variables. */
+
+    if (!is_local_declaration (ref, stack, undef->scope)) {
+
+      /**
+      Check whether this is an (illegal parallel) `for (IDENTIFIER in ...)` construct. */
+
+      if (undef->parallel) {
+	Ast * assignment = ast_parent (n, sym_assignment_expression);
+	if (ast_is_identifier_expression (assignment)) {
+	  while (assignment->parent->sym == sym_expression)
+	    assignment = assignment->parent;
+	  if (ast_schema (assignment->parent, sym_forin_statement,
+			  2, sym_expression))
+	    check_missing_reductions (ref, stack, undef->scope);
+	}
+      }
+    }
+      
     break;
   }
     
@@ -805,7 +883,8 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
       Ast * ref = ast_find (n->child[0], sym_direct_declarator,
 			    0, sym_generic_identifier,
 			    0, sym_IDENTIFIER);
-      set_undefined (ref, undef->scope);
+      if (ref)
+	set_undefined (ref, undef->scope);
       ast_erase (n->child[1]);
       n->child[1] = NULL;
     }
@@ -1066,6 +1145,61 @@ Ast * null_expression (Ast * n)
 			     NA (n, sym_IDENTIFIER, "NULL"))));
 }
 
+static
+void set_undefined_parameter (Ast * parameter)
+{
+  AstTerminal * pointer = NCB (parameter->child[1], "*");
+  Ast * undefined = 
+    NN (parameter, sym_declaration_specifiers,
+	NN (parameter, sym_type_specifier,
+	    NN (parameter, sym_types,
+		NB (parameter->child[1], sym_TYPEDEF_NAME,
+		    "_stencil_undefined"))));
+  ast_erase (parameter->child[0]);
+  ast_set_child (parameter, 0, undefined);
+  ast_replace_child (parameter, 1,
+		     NN (parameter, sym_declarator,
+			 NN (parameter, sym_pointer,
+			     pointer),
+			 NN (parameter, sym_direct_declarator,
+			     NN (parameter, sym_generic_identifier,
+				 ast_find (parameter->child[1],
+					   sym_direct_declarator,
+					   0, sym_generic_identifier,
+					   0, sym_IDENTIFIER)))));
+  ast_flatten (parameter, ast_left_terminal (parameter));
+}
+
+/**
+This function sets undefined point function parameters based on undefined
+function call arguments. */
+
+static
+void set_undefined_parameters (Ast * point_function, const Ast * function_call)
+{
+  Ast * arguments = ast_schema (function_call, sym_function_call,
+				2, sym_argument_expression_list);
+  Ast * parameters = ast_find (point_function, sym_direct_declarator,
+			       2, sym_parameter_type_list,
+			       0, sym_parameter_list);
+  Ast * parameter = parameters ? (parameters->child[1] ? parameters->child[2] :
+				  parameters->child[0]) : NULL;
+  foreach_item (arguments, 2, argument) {
+    if (!parameter) {
+      fprintf (stderr, "%s:%d: error: too many arguments in function call\n",
+	       ast_left_terminal (function_call)->file, ast_left_terminal (function_call)->line);
+      exit (1);
+    }
+    if (argument == ast_placeholder)
+      set_undefined_parameter (parameter);
+    parameters = parameters && parameters != ast_placeholder &&
+      parameters->child[1] ? parameters->child[0] : NULL;
+    parameter = parameters ? (parameters->child[1] ? parameters->child[2] :
+			      parameters->child[0]) : NULL;
+    arguments = _list;
+  }
+}
+
 static void point_function_calls (Ast * n, Stack * stack, void * data)
 {
   Undefined * undef = data;
@@ -1116,18 +1250,67 @@ static void point_function_calls (Ast * n, Stack * stack, void * data)
     return; // recursive function call
 
   /**
-  Look for a previously-defined stencil function, otherwise copy the
-  function definition. */
+  Look for a previously-defined stencil function. */
 
-  Ast * new_stencil = NULL;
   Ast * stencil = get_stencil_function (function_definition);
-  if (!stencil)
-    stencil = ast_copy (function_definition), new_stencil = stencil;
+  if (!stencil) {
+    
+    /**
+    We need to create the new stencil function. */  
 
+    Ast * new_stencil = ast_copy (function_definition);
+    set_undefined_parameters (new_stencil, n);
+    stencil = ast_stencil (new_stencil, undef->parallel, undef->overflow, undef->nowarning);
+    if (!stencil) {
+      ast_destroy (new_stencil);
+      ast_erase (n);
+      return;
+    }
+    else {
+      Ast * m = function_definition;
+      AstTerminal * t = ast_terminal_new (m, sym_VOID, "void");
+      str_append (t->before, " ");
+      Ast * specifiers = NN (m, sym_declaration_specifiers,
+			     NN (m, sym_storage_class_specifier,
+				 ast_terminal_new (m, sym_STATIC, "static")),
+			     NN (m, sym_declaration_specifiers,
+				 NN (m, sym_type_specifier,
+				     NN (m, sym_types, t))));
+      ast_replace_child (ast_schema (stencil, sym_function_definition,
+				     0, sym_function_declaration),
+			 0,
+			 specifiers);
+      str_prepend (ast_terminal (ast_function_identifier (stencil))->start,
+		   "_stencil_");
+      append_function_declaration (function_definition, stencil);
+    
+      /**
+      We also create the corresponding declaration if necessary. */
+
+      if (function_declaration) {
+	Ast * semicolumn =
+	  ast_terminal_new_char ((Ast *) ast_right_terminal (stencil->child[0]),
+				 ";");
+	Ast * specifiers = ast_copy (ast_schema (stencil, sym_function_definition,
+						 0, sym_function_declaration,
+						 0, sym_declaration_specifiers));
+	Ast * declarator = ast_copy (ast_schema (stencil, sym_function_definition,
+						 0, sym_function_declaration,
+						 1, sym_declarator));
+	Ast * declaration = NN (n, sym_declaration,
+				specifiers,
+				NN (n, sym_init_declarator_list,
+				    NN (n, sym_init_declarator,
+					declarator)),
+				semicolumn);
+	append_function_declaration (function_declaration, declaration);
+      }
+    }   
+  }
+    
   /**
-  We either set undefined function parameters based on undefined
-  function call arguments, or check that the undefined function call
-  arguments match undefined function parameters. */
+  We check that the undefined function call arguments match undefined
+  function parameters. */
   
   Ast * arguments = ast_schema (n, sym_function_call,
 				2, sym_argument_expression_list);
@@ -1144,50 +1327,22 @@ static void point_function_calls (Ast * n, Stack * stack, void * data)
       exit (1);
     }
     if (argument == ast_placeholder) {
-      if (new_stencil) {
 
-	/**
-	This is a new stencil, we replace the parameter with an
-	undefined type. */
+      /**
+      We check that the undefined argument corresponds with an undefined parameter. */
 
-	AstTerminal * pointer = NCB (parameter->child[1], "*");
-	Ast * undefined = 
-	  NN (parameter, sym_declaration_specifiers,
-	      NN (parameter, sym_type_specifier,
-		  NN (parameter, sym_types,
-		      NA (parameter->child[1], sym_TYPEDEF_NAME,
-			  "_stencil_undefined"))));
-	ast_erase (parameter->child[0]);
-	ast_set_child (parameter, 0, undefined);
-	ast_replace_child (parameter, 1,
-			   NN (parameter, sym_declarator,
-			       NN (parameter, sym_pointer,
-				   pointer),
-			       NN (parameter, sym_direct_declarator,
-				   NN (parameter, sym_generic_identifier,
-				       ast_find (parameter->child[1],
-						 sym_direct_declarator,
-						 0, sym_generic_identifier,
-						 0, sym_IDENTIFIER)))));
-      }
-      else {
-
-	/**
-	This is not a new stencil, we check that the undefined
-	argument corresponds with an undefined parameter. */
-
-	if (!is_undefined_parameter (parameter)) {
-	  fprintf (stderr, "%s:%d: error: stencils: not expecting an undefined "
-		   "argument for '%s'\n",
-		   ast_left_terminal (n)->file, ast_left_terminal (n)->line,
-		   ast_terminal (ast_find (parameter->child[1],
-					   sym_IDENTIFIER))->start);
-	  exit (1);
-	}
+      if (!is_undefined_parameter (parameter)) {
+	fprintf (stderr, "%s:%d: error: stencils: not expecting an undefined "
+		 "argument for '%s'\n",
+		 ast_left_terminal (n)->file, ast_left_terminal (n)->line,
+		 ast_terminal (ast_find (parameter->child[1],
+					 sym_IDENTIFIER))->start);
+	exit (1);
       }
 
       /**
       We replace the undefined argument with a NULL value. */
+
       int index = arguments->child[1] ? 2 : 0;
       ast_replace_child (arguments, index,
 			 NN (n, sym_argument_expression_list_item,
@@ -1195,69 +1350,17 @@ static void point_function_calls (Ast * n, Stack * stack, void * data)
     }
 
     /**
-    If the parameter is undefined with replace the argument with a
+    If the parameter is undefined we replace the argument with a
     NULL value. */
+
     else if (is_undefined_parameter (parameter))
       ast_replace_child (argument, 0, null_expression (argument));
 
     parameters = parameters && parameters != ast_placeholder &&
       parameters->child[1] ? parameters->child[0] : NULL;
-    parameter = parameters ?
-      (parameters->child[1] ? parameters->child[2] :
-       parameters->child[0]) : NULL;
+    parameter = parameters ? (parameters->child[1] ? parameters->child[2] :
+			      parameters->child[0]) : NULL;
     arguments = _list;
-  }
-
-  /**
-  We create the new stencil function (if necessary). */  
-
-  if (!new_stencil)
-    return;
-  stencil = ast_stencil (stencil,
-			 undef->parallel, undef->overflow, undef->nowarning);
-  if (!stencil) {
-    ast_destroy (new_stencil);
-    ast_erase (n);
-  }
-  else {
-    Ast * m = function_definition;
-    AstTerminal * t = ast_terminal_new (m, sym_VOID, "void");
-    str_append (t->before, " ");
-    Ast * specifiers = NN (m, sym_declaration_specifiers,
-			   NN (m, sym_storage_class_specifier,
-			       ast_terminal_new (m, sym_STATIC, "static")),
-			   NN (m, sym_declaration_specifiers,
-			       NN (m, sym_type_specifier,
-				   NN (m, sym_types, t))));
-    ast_replace_child (ast_schema (stencil, sym_function_definition,
-				   0, sym_function_declaration),
-		       0,
-		       specifiers);
-    str_prepend (ast_terminal (ast_function_identifier (stencil))->start,
-		 "_stencil_");
-    append_function_declaration (function_definition, stencil);
-    
-    /**
-    We also create the corresponding declaration if necessary. */
-
-    if (function_declaration) {
-      Ast * semicolumn =
-	ast_terminal_new_char ((Ast *) ast_right_terminal (stencil->child[0]),
-			       ";");
-      Ast * specifiers = ast_copy (ast_schema (stencil, sym_function_definition,
-					       0, sym_function_declaration,
-					       0, sym_declaration_specifiers));
-      Ast * declarator = ast_copy (ast_schema (stencil, sym_function_definition,
-					       0, sym_function_declaration,
-					       1, sym_declarator));
-      Ast * declaration = NN (n, sym_declaration,
-			      specifiers,
-			      NN (n, sym_init_declarator_list,
-				  NN (n, sym_init_declarator,
-				      declarator)),
-			      semicolumn);
-      append_function_declaration (function_declaration, declaration);
-    }
   }
 }
 
@@ -1320,13 +1423,15 @@ void mark_unused (Ast * n, Stack * stack, void * scope)
   switch (n->sym) {
 
   case sym_IDENTIFIER: {
-    if (ast_ancestor (n, 3)->sym == sym_function_call)
+    if (ast_ancestor (n, 3)->sym == sym_function_call || ast_parent (n, sym_forin_arguments))
       return;
     if (ast_ancestor (n, 2)->sym == sym_direct_declarator) {      
       if (ast_scope_parent (n, sym_struct_declarator, sym_declaration))
 	return;
+      Ast * parent;
       if (ast_ancestor (n, 4)->sym == sym_forin_declaration_statement ||
-	  ast_scope_parent (n, sym_init_declarator, sym_declaration)->child[1])
+	  ast_parent (n, sym_function_declaration) ||
+	  ((parent = ast_scope_parent (n, sym_init_declarator, sym_declaration)) && parent->child[1]))
 	initialize (n);
       else
 	declare (n, scope);
@@ -1334,8 +1439,7 @@ void mark_unused (Ast * n, Stack * stack, void * scope)
     }
     if (n->parent->sym != sym_primary_expression)
       return;
-    Ast * ref = ast_identifier_declaration_from_to
-      (stack, ast_terminal (n)->start, NULL, scope);
+    Ast * ref = ast_identifier_declaration_from_to (stack, ast_terminal (n)->start, NULL, scope);
     if (ref) {
       Ast * expr = ast_scope_parent (n, sym_expression, sym_statement);
       if (expr) {
@@ -1381,13 +1485,16 @@ void remove_undefined (Ast * n, Stack * stack, void * scope)
       ast_ancestor (n, 3)->sym != sym_function_call &&
       ast_ancestor (n, 2)->sym != sym_direct_declarator &&
       n->parent->sym == sym_primary_expression &&
+      !ast_parent (n, sym_forin_arguments) &&
+      strcmp (ast_terminal (n)->start, "point") &&
       (ref = ast_identifier_declaration (stack, ast_terminal (n)->start)) &&
       (is_declared (ref, scope) || is_initialized (ref))) {
 #if 0
-    fprintf (stderr, "%s:%d: '%s' undefined\n",
+    fprintf (stderr, "%s:%d: '%s' undefined %d %d\n",
 	     ast_terminal (n)->file,
 	     ast_terminal (n)->line,
-	     ast_terminal (n)->start);
+	     ast_terminal (n)->start,
+	     is_declared (ref, scope), is_initialized (ref));
 #endif
     ast_erase (n);
   }
@@ -1401,8 +1508,47 @@ void remove_unused (Ast * n, Stack * stack, void * data)
   Undefined * undef = data;
   if (n->sym == sym_IDENTIFIER &&
       (is_declared (n, undef->scope) || is_initialized (n))) {
-    ast_erase (n);
-    undef->undefined = true;
+    Ast * decl = ast_parent (n, sym_function_declaration);
+    if (!decl || decl->parent != undef->scope) {
+#if 0
+      fprintf (stderr, "%s:%d: '%s' unused %d %d\n",
+	       ast_terminal (n)->file,
+	       ast_terminal (n)->line,
+	       ast_terminal (n)->start,
+	       is_declared (n, undef->scope), is_initialized (n));
+#endif
+      ast_erase (n);
+      undef->undefined = true;
+    }
+    else { // (unused) Point function parameters
+      Ast * parameter = ast_parent (n, sym_parameter_declaration);
+      if (!parameter) { // the function name
+	use (n);
+	return;
+      }
+      Ast * name;
+      if (!strcmp (ast_terminal (n)->start, "point") &&
+	  (name = ast_schema (ast_ancestor (n, 4), sym_parameter_declaration,
+			      0, sym_declaration_specifiers,
+			      0, sym_type_specifier,
+			      0, sym_types,
+			      0, sym_TYPEDEF_NAME)) &&
+	  !strcmp (ast_terminal (name)->start, "Point")) { // 'Point point' parameter
+	use (n);
+	return;
+      }
+#if 0
+      fprintf (stderr, "%s:%d: '%s' parameter unused %d %d\n",
+	       ast_terminal (n)->file,
+	       ast_terminal (n)->line,
+	       ast_terminal (n)->start,
+	       is_declared (n, undef->scope), is_initialized (n));
+#endif
+      /**
+      We replace the unused parameter with an undefined type. */
+
+      set_undefined_parameter (parameter);
+    }
   }
   else
     ast_cleanup (n, stack, undef->scope, true);
@@ -1432,13 +1578,15 @@ does not contain any field access. */
 
 Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning)
 {
+  assert (n->sym == sym_foreach_statement ||
+	  n->sym == sym_function_definition);
   AstRoot * root = ast_get_root (n);
   Stack * stack = root->stack;
   stack_push (stack, &n);
   if (parallel && is_serial (n))
     parallel = false;
   Undefined u = {n, parallel, overflow, nowarning};
-  ast_traverse (n, stack, move_field_accesses, &u);
+  move_field_accesses (n, stack, &u);
   Ast * m = n->sym == sym_foreach_statement ? ast_child (n, sym_statement) : n;
   do {
     u.undefined = false;
@@ -1446,21 +1594,19 @@ Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning)
   } while (u.undefined);
   ast_traverse (m, stack, point_function_calls, &u);
 
-  Ast * statement =  (n->sym == sym_foreach_statement ?
-		      ast_child (n, sym_statement) :
+  Ast * statement =  (n->sym == sym_foreach_statement ? ast_child (n, sym_statement) :
 		      ast_child (n, sym_compound_statement));
   do {
-    ast_traverse (statement, stack, mark_unused, n);
+    ast_traverse (n, stack, mark_unused, n);
     ast_traverse (statement, stack, remove_undefined, n);
     u.undefined = false;
-    ast_traverse (statement, stack, remove_unused, &u);
+    ast_traverse (n, stack, remove_unused, &u);
   } while (u.undefined);
   
   ast_pop_scope (stack, n);
   if (n->sym == sym_foreach_statement && !ast_child (n, sym_statement))
     return NULL;
-  if (n->sym == sym_function_definition &&
-      !ast_child (n, sym_compound_statement))
+  if (n->sym == sym_function_definition && !ast_child (n, sym_compound_statement))
     return NULL;
   return CHECK (n);
 }

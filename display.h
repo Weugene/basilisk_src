@@ -84,7 +84,7 @@ display ("squares (color = 'u.x', spread = -1);", true);
 #endif
 
 #include <netdb.h>
-#include "wsServer/include/ws.h"
+#include <wsServer/include/ws.h>
 #pragma autolink -L$BASILISK/wsServer -lws
 
 #include "view.h"

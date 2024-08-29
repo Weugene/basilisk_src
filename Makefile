@@ -36,6 +36,9 @@ qcc: qcc.c include.o postproc.o ast/libast.a config
 include.o: include.c
 	$(CC) $(CFLAGS) -DLIBDIR=\"`pwd`\" -c include.c
 
+postproc.o: postproc.c
+	$(CC) $(CFLAGS) -DLIBDIR=\"`pwd`\" -c postproc.c
+
 # uncomment the recipe below if you need to regenerate draw_get.h
 # and draw_json.h
 

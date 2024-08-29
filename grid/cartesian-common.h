@@ -47,7 +47,34 @@ void (* debug)    (Point);
 
 @define end_foreach_face()
 
+@def foreach_point(...)
+{
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  coord _p = { S__VA_ARGS__ };
+  Point point = locate (_p.x, _p.y, _p.z); // fixme
+  if (point.level >= 0) {
+    POINT_VARIABLES
+@
+@define end_foreach_point() }}
+
+@def foreach_region(p, box, n)
+  OMP_PARALLEL() { NOT_UNUSED (p);
+    coord p = {0, 0, box[0].z};
+    OMP(omp for schedule(static))
+      for (int _i = 0; _i < (int) n.x; _i++) {
+	p.x = box[0].x + (box[1].x - box[0].x)/n.x*(_i + 0.5);
+	for (int _j = 0; _j < (int) n.y; _j++) {
+	  p.y = box[0].y + (box[1].y - box[0].y)/n.y*(_j + 0.5);
+	  Point point = locate (p.x, p.y, p.z); // fixme
+	  if (point.level >= 0) {
+	    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+	    POINT_VARIABLES
+@
+@define end_foreach_region() }}}}
+
 // field allocation
+//
+// if this routine is modified, do not forget to update /src/ast/interpreter/overload.h
 
 static void init_block_scalar (scalar sb, const char * name, const char * ext,
 			       int n, int block)
@@ -56,20 +83,21 @@ static void init_block_scalar (scalar sb, const char * name, const char * ext,
   if (n == 0) {
     strcat (strcpy (bname, name), ext);
     sb.block = block;
-    init_scalar (sb, bname);
     baseblock = list_append (baseblock, sb);
   }
   else {
+     // fixme: should use functions compatible with the interpreter
     sprintf (bname, "%s%d%s", name, n, ext);
     sb.block = - n;
-    init_scalar (sb, bname);
   }
+  sb.name = strdup (bname);
   all = list_append (all, sb);
 }
 
 @define interpreter_set_int(...)
+@define interpreter_reset_scalar(...)
 
-scalar new_block_scalar (const char * name, const char * ext, int block)
+scalar alloc_block_scalar (const char * name, const char * ext, int block)
 {
   interpreter_set_int (&block);
   int nvar = datasize/sizeof(double);
@@ -81,8 +109,11 @@ scalar new_block_scalar (const char * name, const char * ext, int block)
     while (sb.i < nvar && n < block && sb.freed)
       n++, sb.i++;
     if (n >= block) { // found n free slots
-      for (sb.i = s.i, n = 0; n < block; n++, sb.i++)
+      memset (&_attribute[s.i], 0, block*sizeof (_Attributes));
+      for (sb.i = s.i, n = 0; n < block; n++, sb.i++) {
 	init_block_scalar (sb, name, ext, n, block);
+	interpreter_reset_scalar (sb);
+      }
       trash (((scalar []){s, {-1}})); // fixme: only trashes one block?
       return s;
     }
@@ -92,38 +123,40 @@ scalar new_block_scalar (const char * name, const char * ext, int block)
   // need to allocate new slots
   s = (scalar){nvar};
   assert (nvar + block <= _NVARMAX);
-  qrealloc (_attribute, nvar + block, _Attributes);
+
+  if (_attribute == NULL)
+    _attribute = (_Attributes *) calloc (nvar + block + 1, sizeof (_Attributes));
+  else
+    _attribute = (_Attributes *)
+      realloc (_attribute, (nvar + block + 1)*sizeof (_Attributes));
   memset (&_attribute[nvar], 0, block*sizeof (_Attributes));
-  // allocate extra space on the grid
-  realloc_scalar (block*sizeof(double));
-  trash (((scalar []){s, {-1}})); // fixme: only trashes one block?
   for (int n = 0; n < block; n++, nvar++) {
     scalar sb = (scalar){nvar};
     init_block_scalar (sb, name, ext, n, block);
   }
+  // allocate extra space on the grid
+  realloc_scalar (block*sizeof(double));
+  trash (((scalar []){s, {-1}})); // fixme: only trashes one block?
   return s;
 }
 
+scalar new_block_scalar (const char * name, const char * ext, int block)
+{
+  scalar s = alloc_block_scalar (name, ext, block), sb;
+  int n = 0;
+  for (sb.i = s.i, n = 0; n < block; n++, sb.i++)
+    init_scalar (sb, NULL);
+  return s;
+}
+  
 scalar new_scalar (const char * name)
 {
-  return new_block_scalar (name, "", 1);
+  return init_scalar (alloc_block_scalar (name, "", 1), NULL);
 }
 
 scalar new_vertex_scalar (const char * name)
 {
-  scalar s = new_block_scalar (name, "", 1);
-  init_vertex_scalar (s, NULL);
-  return s;
-}
-
-scalar new_block_vertex_scalar (const char * name, int block)
-{
-  scalar s = new_block_scalar (name, "", block);
-  for (int i = 0; i < block; i++) {
-    scalar sb = {s.i + i};
-    init_vertex_scalar (sb, NULL);
-  }
-  return s;
+  return init_vertex_scalar (alloc_block_scalar (name, "", 1), NULL);
 }
 
 static vector alloc_block_vector (const char * name, int block)
@@ -131,7 +164,7 @@ static vector alloc_block_vector (const char * name, int block)
   vector v;
   struct { char * x, * y, * z; } ext = {".x", ".y", ".z"};
   foreach_dimension()
-    v.x = new_block_scalar (name, ext.x, block);
+    v.x = alloc_block_scalar (name, ext.x, block);
   return v;
 }
 
@@ -188,7 +221,7 @@ tensor new_tensor (const char * name)
   tensor t;
   foreach_dimension() {
     strcat (strcpy (cname, name), ext.x);
-    t.x = new_vector (cname);
+    t.x = alloc_block_vector (cname, 1);
   }
   init_tensor (t, NULL);
   return t;
@@ -196,24 +229,18 @@ tensor new_tensor (const char * name)
 
 tensor new_symmetric_tensor (const char * name)
 {
-  char cname[strlen(name) + 5];
   struct { char * x, * y, * z; } ext = {".x.x", ".y.y", ".z.z"};
   tensor t;
-  foreach_dimension() {
-    strcat (strcpy (cname, name), ext.x);
-    t.x.x = new_scalar(cname);
-  }
+  foreach_dimension()
+    t.x.x = alloc_block_scalar (name, ext.x, 1);
   #if dimension > 1
-    strcat (strcpy (cname, name), "x.y");
-    t.x.y = new_scalar(cname);
+    t.x.y = alloc_block_scalar (name, ".x.y", 1);
     t.y.x = t.x.y;
   #endif
   #if dimension > 2
-    strcat (strcpy (cname, name), "x.z");
-    t.x.z = new_scalar(cname);
+    t.x.z = alloc_block_scalar (name, ".x.z", 1);
     t.z.x = t.x.z;
-    strcat (strcpy (cname, name), "y.z");
-    t.y.z = new_scalar(cname);
+    t.y.z = alloc_block_scalar (name, ".y.z", 1);
     t.z.y = t.y.z;
   #endif
   /* fixme: boundary conditions don't work!  This is because boundary
@@ -256,23 +283,23 @@ vector new_const_vector (const char * name, int i, double * val)
   return v;
 }
 
-void scalar_clone (scalar a, scalar b)
+static void cartesian_scalar_clone (scalar clone, scalar src)
 {
-  char * name = a.name;
-  double (** boundary) (Point, Point, scalar, void *) = a.boundary;
+  char * cname = clone.name;
+  double (** boundary) (Point, Point, scalar, void *) = clone.boundary;
   double (** boundary_homogeneous) (Point, Point, scalar, void *) =
-    a.boundary_homogeneous;
-  assert (b.block > 0 && a.block == b.block);
-  free (a.depends);
-  _attribute[a.i] = _attribute[b.i];
-  a.name = name;
-  a.boundary = boundary;
-  a.boundary_homogeneous = boundary_homogeneous;
+    clone.boundary_homogeneous;
+  assert (src.block > 0 && clone.block == src.block);
+  free (clone.depends);
+  _attribute[clone.i] = _attribute[src.i];
+  clone.name = cname;
+  clone.boundary = boundary;
+  clone.boundary_homogeneous = boundary_homogeneous;
   for (int i = 0; i < nboundary; i++) {
-    a.boundary[i] = b.boundary[i];
-    a.boundary_homogeneous[i] = b.boundary_homogeneous[i];
+    clone.boundary[i] = src.boundary[i];
+    clone.boundary_homogeneous[i] = src.boundary_homogeneous[i];
   }
-  a.depends = list_copy (b.depends);
+  clone.depends = list_copy (src.depends);
 }
 
 scalar * list_clone (scalar * l)
@@ -282,8 +309,7 @@ scalar * list_clone (scalar * l)
   for (int i = 0; i < nvar; i++)
     map[i] = -1;
   for (scalar s in l) {
-    scalar c = s.block > 1 ? new_block_scalar("c", "", s.block) :
-      new_scalar("c");
+    scalar c = s.block > 1 ? new_block_scalar("c", "", s.block) : new_scalar("c");
     scalar_clone (c, s);
     map[s.i] = c.i;
     list = list_append (list, c);
@@ -322,8 +348,8 @@ void delete (scalar * list)
   trash (list);
   for (scalar f in list) {
     if (f.block > 0) {
-      scalar * s = all;
-      for (; s->i >= 0 && s->i != f.i; s++);
+      scalar * s;
+      for (s = all; s->i >= 0 && s->i != f.i; s++);
       if (s->i == f.i) {
 	for (; s[f.block].i >= 0; s++)
 	  s[0] = s[f.block];
@@ -489,10 +515,11 @@ scalar cartesian_init_scalar (scalar s, const char * name)
   double (** boundary) (Point, Point, scalar, void *) = s.boundary;
   double (** boundary_homogeneous) (Point, Point, scalar, void *) =
     s.boundary_homogeneous;
-  // reset all attributes  
-  _attribute[s.i] = (const _Attributes){0};
   s.name = pname;
-  s.block = block == 0 ? 1 : block;
+  if (block < 0)
+    s.block = block;
+  else
+    s.block = block > 0 ? block : 1;
   /* set default boundary conditions */  
   s.boundary = boundary ? boundary :
     (double (**)(Point, Point, scalar, void *))
@@ -514,7 +541,7 @@ scalar cartesian_init_scalar (scalar s, const char * name)
 
 scalar cartesian_init_vertex_scalar (scalar s, const char * name)
 {
-  s = cartesian_init_scalar (s, name);
+  cartesian_init_scalar (s, name);
   foreach_dimension()
     s.d.x = -1;
   for (int d = 0; d < nboundary; d++)
@@ -535,7 +562,7 @@ vector cartesian_init_vector (vector v, const char * name)
     if (name) {
       char cname[strlen(name) + 3];
       strcat (strcpy (cname, name), ext.x);
-      init_scalar (v.x, cname);
+      cartesian_init_scalar (v.x, cname);
     }
     else
       init_scalar (v.x, NULL);
@@ -567,10 +594,10 @@ tensor cartesian_init_tensor (tensor t, const char * name)
     if (name) {
       char cname[strlen(name) + 3];
       strcat (strcpy (cname, name), ext.x);
-      init_vector (t.x, cname);
+      cartesian_init_vector (t.x, cname);
     }
     else
-      init_vector (t.x, NULL);
+      cartesian_init_vector (t.x, NULL);
   }
   /* set default boundary conditions */
   #if dimension == 1
@@ -763,10 +790,11 @@ void cartesian_methods()
   init_scalar        = cartesian_init_scalar;
   init_vertex_scalar = cartesian_init_vertex_scalar;
   init_vector        = cartesian_init_vector;
-  init_tensor        = cartesian_init_tensor;
   init_face_vector   = cartesian_init_face_vector;
+  init_tensor        = cartesian_init_tensor;
   boundary_level     = cartesian_boundary_level;
   boundary_face      = cartesian_boundary_face;
+  scalar_clone       = cartesian_scalar_clone;
   debug              = cartesian_debug;
 }
 
@@ -807,40 +835,33 @@ static double interpolate_linear (Point point, scalar v,
 }
 
 trace
-double interpolate (scalar v, double xp = 0., double yp = 0., double zp = 0.)
+double interpolate (scalar v, double xp = 0., double yp = 0., double zp = 0.,
+		    bool linear = true)
 {
-  boundary ({v});
-  Point point = locate (xp, yp, zp);
-  if (point.level < 0)
-    return nodata;
-  return interpolate_linear (point, v, xp, yp, zp);
+  double val = nodata;
+  foreach_point (xp, yp, zp, reduction (min:val))
+    val = linear ? interpolate_linear (point, v, xp, yp, zp) : v[];
+  return val;
 }
 
 trace
 void interpolate_array (scalar * list, coord * a, int n, double * v,
 			bool linear = false)
 {
-  boundary (list);
-  int j = 0;
+  int len = 0;
+  for (scalar s in list)
+    len++;
   for (int i = 0; i < n; i++) {
-    Point point = locate (a[i].x, a[i].y, a[i].z);
-    if (point.level >= 0) {
+    double * w = v;
+    for (scalar s in list)
+      *(w++) = nodata;
+    foreach_point (a[i].x, a[i].y, a[i].z, reduction(min:v[:len])) {
+      int j = 0;
       for (scalar s in list)
-	v[j++] = !linear ? s[] :
-	  interpolate_linear (point, s, a[i].x, a[i].y, a[i].z);
+	v[j++] = !linear ? s[] : interpolate_linear (point, s, a[i].x, a[i].y, a[i].z);
     }
-    else
-      for (scalar s in list)
-	v[j++] = nodata;
+    v = w;
   }
-@if _MPI
-  if (pid() == 0)
-    MPI_Reduce (MPI_IN_PLACE, v, n*list_len(list), MPI_DOUBLE,
-		MPI_MIN, 0, MPI_COMM_WORLD);
-  else
-    MPI_Reduce (v, v, n*list_len(list), MPI_DOUBLE,
-		MPI_MIN, 0, MPI_COMM_WORLD);
-@endif
 }
 
 // Boundaries

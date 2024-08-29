@@ -24,6 +24,8 @@ A summary of the options/switches:
 * `-progress` : the running code will generate a 'progress' file
 * `-cadna` : support for CADNA
 * `-nolineno` : does not generate code containing code line numbers
+* `-gpu` : computation is done on GPU by default (this is the default)
+* `-cpu` : computation is done on CPU by default
 * `-run=INT` : runs the code with the interpreter with the verbosity 
   level given by INT
 * `-dimensions[=FILE]` : outputs a summary of the dimensions in a file
@@ -52,9 +54,9 @@ All other options will be passed directly to the C compiler. */
 int dimension = 2, bghosts = 0, layers = 0;
   
 int debug = 0, catch = 0, cadna = 0, nolineno = 0, events = 0, progress = 0;
-int parallel = 0;
+int parallel = 0, cpu = 0;
 static FILE * dimensions = NULL;
-static int run = -1, finite = 1, redundant = 0, warn = 0, maxcalls = 15000000;
+static int run = -1, finite = 1, redundant = 0, warn = 0, maxcalls = 20000000;
 char dir[] = ".qccXXXXXX";
 
 char * autolink = NULL;
@@ -113,9 +115,9 @@ void * compdir (FILE * fin, FILE * fout, FILE * swigfp,
 
   void * endfor (FILE * fin, FILE * fout,
 		 const char * grid, int dimension,
-		 int nolineno, int progress, int catch, int parallel,
+		 int nolineno, int progress, int catch, int parallel, int cpu,
 		 FILE * swigfp, char * swigname);
-  void * ast = endfor (fin, fout1, grid, dimension, nolineno, progress, catch, parallel,
+  void * ast = endfor (fin, fout1, grid, dimension, nolineno, progress, catch, parallel, cpu,
 		       swigfp, swigname);
   fclose (fout1);
   
@@ -218,6 +220,10 @@ int main (int argc, char ** argv)
       ;
     else if (!strcmp (argv[i], "-nolineno"))
       nolineno = 1;
+    else if (!strcmp (argv[i], "-cpu"))
+      cpu = 1;
+    else if (!strcmp (argv[i], "-gpu"))
+      cpu = 0;
     else if (!strcmp (argv[i], "-o")) {
       strcat (command1, " ");
       strcat (command1, argv[i++]);
@@ -253,6 +259,10 @@ int main (int argc, char ** argv)
       strcat (command1, " ");
       strcat (command1, argv[i]);
     }
+  }
+  if (source && !file) {
+    fprintf (stderr, "usage: qcc -grid=[GRID] [OPTIONS] FILE.c\n");
+    return 1;
   }
   if (dimensions == stdin) {
     fprintf (stderr, "qcc: error: -dimensions must be given "

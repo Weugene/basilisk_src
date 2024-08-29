@@ -34,7 +34,7 @@ Dimensions of finite constants
   [0]
     dimension-tests/test8.c:30: 'e = 4'
   [1]
-    /src/common.h:856: 'L0 = 1. [1]'
+    /src/common.h:858: 'L0 = 1. [1]'
     dimension-tests/test8.c:11: 'f[] = 1. [1]'
     dimension-tests/test8.c:13: 'f[] = 2.'
     dimension-tests/test8.c:16: '3.'

@@ -25,18 +25,33 @@ attribute {
 }
 
 typedef struct {
+  char * name;       // the name of the variable
+  char * type;       // the type of the variable
+  void * pointer;    // a pointer to the data
+  int * dimensions;  // the dimensions of the array
+  int nd;            // the number of pointer dereferences
+  char reduct;       // the reduction operation
+  scalar data;       // user data
+} NonLocal;
+
+typedef struct {
   const char * fname; // name of the source file
   int line;           // line number in the source
   int first;          // is this the first time the loop is called?
   int face;           // the face component(s) being traversed
   bool vertex;        // is this a vertex traversal?
+  int parallel;       // is this a parallel loop? (0: no, 1: on CPU or GPU, 2: on CPU, 3: on GPU)
+  scalar * listc;     // the scalar fields on which to apply boundary conditions
+  vectorl listf;      // the face vector fields on which to apply (flux) boundary conditions
+  scalar * dirty;     // the dirty fields (i.e. write-accessed)
+  void * data;        // user data
 } ForeachData;
 
 // fixme: this should be rewritten using better macros
-@def foreach_stencil() {
-  static ForeachData _loop = {
-    S__FILE__, S_LINENO,
-    1, 0, 0
+@def foreach_stencil(...) {
+  static int _first = 1.;
+  ForeachData _loop = {
+    .fname = S__FILE__, .line = S_LINENO, .first = _first
   };
   if (baseblock) for (scalar s = baseblock[0], * i = baseblock;
 		s.i >= 0; i++, s = *i) {
@@ -48,20 +63,27 @@ typedef struct {
 @
 
 @def end_foreach_stencil()
-  end_stencil (&_loop);
-  _loop.first = 0;
+  check_stencil (&_loop);
+  boundary_stencil (&_loop);
+  _first = 0;
 }
 @
 
-@define foreach_vertex_stencil() foreach_stencil() _loop.vertex = true;
+@define foreach_vertex_stencil(...) foreach_stencil(S__VA_ARGS__) _loop.vertex = true;
 @define end_foreach_vertex_stencil() end_foreach_stencil()
 
-@define foreach_face_stencil() foreach_stencil()
+@define foreach_face_stencil(...) foreach_stencil(S__VA_ARGS__)
 @define end_foreach_face_stencil() end_foreach_stencil()
 
-@define foreach_visible_stencil(...) foreach_stencil()
-@define end_foreach_visible_stencil(...) end_foreach_stencil()
+@define foreach_visible_stencil(...) foreach_stencil(S__VA_ARGS__)
+@define end_foreach_visible_stencil() end_foreach_stencil()
 
+@define foreach_point_stencil(...) foreach_stencil(S__VA_ARGS__)
+@define end_foreach_point_stencil() end_foreach_stencil()
+
+@define foreach_region_stencil(...) foreach_stencil(S__VA_ARGS__)
+@define end_foreach_region_stencil() end_foreach_stencil()
+  
 @define _stencil_is_face_x() { _loop.face |= (1 << 0);
 @define end__stencil_is_face_x() }
 @define _stencil_is_face_y() { _loop.face |= (1 << 1);
@@ -158,11 +180,9 @@ before the (real) foreach loop is executed. This is where we use the
 stencil access pattern to see whether boundary conditions need to be
 applied. */
 
-void end_stencil (ForeachData * loop)
+void check_stencil (ForeachData * loop)
 {
-  scalar * listc = NULL, * dirty = NULL;
-  vectorl listf = {NULL};
-  bool flux = false;
+  loop->listf = (vectorl){NULL};
   
   /**
   We check the accesses for each field... */
@@ -187,7 +207,7 @@ void end_stencil (ForeachData * loop)
 	
 	if (s.face) {
 	  if (s.width > 0) // face, stencil wider than 0
-	    listc = list_append (listc, s);
+	    loop->listc = list_append (loop->listc, s);
 	  else if (!write) { // face, flux only
 	    scalar sn = s.v.x.i >= 0 ? s.v.x : s;
 	    foreach_dimension()
@@ -197,11 +217,9 @@ void end_stencil (ForeachData * loop)
 		   boundary_face() .*/
 		
 		if (sn.boundary[left] || sn.boundary[right])
-		  listc = list_append (listc, s);
-		else if (s.dirty != 2) {
-		  listf.x = list_append (listf.x, s);
-		  flux = true;
-		}
+		  loop->listc = list_append (loop->listc, s);
+		else if (s.dirty != 2)
+		  loop->listf.x = list_append (loop->listf.x, s);
 	      }
 	  }
 	}
@@ -211,7 +229,7 @@ void end_stencil (ForeachData * loop)
 	stencil is wider than zero. */
 	
 	else if (s.width > 0)
-	  listc = list_append (listc, s);
+	  loop->listc = list_append (loop->listc, s);
       }
 
       /**
@@ -308,63 +326,70 @@ void end_stencil (ForeachData * loop)
 	If the field is write-accessed, we add it to the 'dirty'
 	list. */
 	
-	dirty = list_append (dirty, s);
+	loop->dirty = list_append (loop->dirty, s);
 	for (scalar d in baseblock)
 	  if (scalar_depends_from (d, s))
-	    dirty = list_append (dirty, d);
+	    loop->dirty = list_append (loop->dirty, d);
       }
     }
   }
+}
 
-  /**
-  We apply face (flux) boundary conditions. */
-  
+/**
+This functions applies the boundary conditions, as defined by `check_stencil()`. */
+
+void boundary_stencil (ForeachData * loop)
+{
+  bool flux = false;
+  foreach_dimension()
+    if (loop->listf.x)
+      flux = true;
   if (flux) {
 #if PRINTBOUNDARY
     int i = 0;
     foreach_dimension() {
-      if (listf.x) {
+      if (loop->listf.x) {
 	fprintf (stderr, "%s:%d: flux %c:", loop->fname, loop->line, 'x' + i);
-	for (scalar s in listf.x)
+	for (scalar s in loop->listf.x)
 	  fprintf (stderr, " %d:%s", s.i, s.name);
 	fputc ('\n', stderr);
       }
       i++;
     }
 #endif
-    boundary_face (listf);
+    boundary_face (loop->listf);
     foreach_dimension()
-      free (listf.x);
+      free (loop->listf.x), loop->listf.x = NULL;
   }
   
   /**
   We apply "full" boundary conditions. */
 
-  if (listc) {
+  if (loop->listc) {
 #if PRINTBOUNDARY
     fprintf (stderr, "%s:%d: listc:", loop->fname, loop->line);
-    for (scalar s in listc)
+    for (scalar s in loop->listc)
       fprintf (stderr, " %d:%s", s.i, s.name);
     fputc ('\n', stderr);
 #endif
-    boundary_internal (listc, loop->fname, loop->line);
-    free (listc);
+    boundary_internal (loop->listc, loop->fname, loop->line);
+    free (loop->listc), loop->listc = NULL;
   }
 
   /**
   We update the dirty status of fields which will be write-accessed by
   the foreach loop. */
   
-  if (dirty) {
+  if (loop->dirty) {
 #if PRINTBOUNDARY
     fprintf (stderr, "%s:%d: dirty:", loop->fname, loop->line);
-    for (scalar s in dirty)
+    for (scalar s in loop->dirty)
       fprintf (stderr, " %d:%s", s.i, s.name);
     fputc ('\n', stderr);
 #endif
-    for (scalar s in dirty)
+    for (scalar s in loop->dirty)
       s.dirty = true;
-    free (dirty);
+    free (loop->dirty), loop->dirty = NULL;
   }
 }
 

@@ -1,5 +1,5 @@
 #include <stdarg.h>
-#include "kdt/kdt.h"
+#include <kdt/kdt.h>
 #pragma autolink -L$BASILISK/kdt -lkdt
 
 @if _OPENMP
@@ -15,20 +15,28 @@ attribute {
   scalar nt, dmin, dmax;
 }
 
-static int includes (KdtRect rect, Point * p)
+static int includes_point (KdtRect rect, Point point)
 {
-  Point point = *p;
   Delta_x /= 2.; Delta_y /= 2.;
   return (rect[0].l >= x - Delta_x && rect[0].h <= x + Delta_x &&
 	  rect[1].l >= y - Delta_y && rect[1].h <= y + Delta_y);
 }
-
-static int intersects (KdtRect rect, Point * p)
+  
+static int includes (KdtRect rect, Point * p)
 {
-  Point point = *p;
+  return includes_point (rect, *p);
+}
+
+static int intersects_point (KdtRect rect, Point point)
+{
   Delta_x /= 2.; Delta_y /= 2.;
   return (rect[0].l <= x + Delta_x && rect[0].h >= x - Delta_x &&
 	  rect[1].l <= y + Delta_y && rect[1].h >= y - Delta_y);
+}
+
+static int intersects (KdtRect rect, Point * p)
+{
+  return intersects_point (rect, *p);
 }
 
 static void reconstruct_terrain (Point point, scalar zb)

@@ -20,6 +20,7 @@ examples)"*](/src/test/README#running-and-creating-test-cases-and-examples).
 * [Vortex shedding behind a sphere at Re=300](sphere.c)
 * [Forced isotropic turbulence in a triply-periodic box](isotropic.c)
 * [Stokes flow through a complex 3D porous medium](porous3D.c)
+* [Coupling two solvers](master.c)
 
 ## Two-phase flows
 

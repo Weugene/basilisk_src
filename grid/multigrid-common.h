@@ -238,6 +238,21 @@ static scalar multigrid_init_vertex_scalar (scalar s, const char * name)
   return s;
 }
 
+static void multigrid_setup_vector (vector v)
+{
+  foreach_dimension() {
+    v.x.prolongation = refine_bilinear;
+    v.x.restriction = restriction_average;
+  }  
+}
+
+static vector multigrid_init_vector (vector v, const char * name)
+{
+  v = cartesian_init_vector (v, name);
+  multigrid_setup_vector (v);
+  return v;
+}
+
 static vector multigrid_init_face_vector (vector v, const char * name)
 {
   v = cartesian_init_face_vector (v, name);
@@ -245,6 +260,14 @@ static vector multigrid_init_face_vector (vector v, const char * name)
     v.y.restriction = no_restriction;
   v.x.restriction = restriction_face;
   return v;
+}
+
+static tensor multigrid_init_tensor (tensor t, const char * name)
+{
+  t = cartesian_init_tensor (t, name);
+  foreach_dimension()
+    multigrid_setup_vector (t.x);
+  return t;
 }
 
 void multigrid_debug (Point point)
@@ -406,11 +429,13 @@ static void multigrid_restriction (scalar * list)
 void multigrid_methods()
 {
   cartesian_methods();
-  debug              = multigrid_debug;
   init_scalar        = multigrid_init_scalar;
   init_vertex_scalar = multigrid_init_vertex_scalar;
+  init_vector        = multigrid_init_vector;
   init_face_vector   = multigrid_init_face_vector;
+  init_tensor        = multigrid_init_tensor;
   restriction        = multigrid_restriction;
+  debug              = multigrid_debug;
 }
 
 /**

@@ -1,7 +1,7 @@
 CFLAGS += -I.. -DBASILISK=\"$(subst /ast,,$(CURDIR))\"
 
 OBJECTS = ast.o tokens.o basilisk.o translate.o allocator.o \
-	faststack.o stencil.o check.o interpreter/interpreter.o
+	faststack.o stencil.o types.o references.o check.o interpreter/interpreter.o
 
 TOPTARGETS = all clean check
 
@@ -54,7 +54,7 @@ faststack.o: stack.h symbols.h ast.h
 
 tokens.o: ast.h basilisk.c
 
-translate.o: ast.h symbols.h
+translate.o: ast.h symbols.h einstein_sum.h
 
 stencil.o: ast.h symbols.h
 
@@ -63,6 +63,10 @@ allocator.o: allocator.h
 check.o: ast.h symbols.h grammar.h
 
 expr.o: ast.h symbols.h
+
+types.o: ast.h symbols.h
+
+references.o: ast.h symbols.h
 
 clean:
 	rm -f *.o *.a

@@ -990,15 +990,29 @@ char *yytext;
     _stack[++stack] = f;
     return f;    
   }
-  
+
+  static int strcmps (char * s1, char * s2) {
+    while (*s1 != '\0' && *s2 != '\0') {
+      if (*s1 != *s2)
+	return 1;
+      if (*s1 == '/') {
+	while (*s1 == '/') s1++;
+	while (*s2 == '/') s2++;
+      }
+      else
+	s1++, s2++;
+    }
+    return !(*s1 == '\0' && *s2 == '\0');
+  }
+
   static void push_once (char * s) {
     static char * _processed[100];
     static int processed = 0;
     int i;
     char * s1 = strip_path (s);
     for (i = 0; i < processed; i++)
-      if (!strcmp (s1, strip_path (_processed[i])))
-	return; // already processed
+      if (!strcmps (s1, strip_path (_processed[i])))
+	return; // already processed    
     assert (processed < 100);
     _processed[processed++] = push (s);
   }
@@ -1098,8 +1112,8 @@ char *yytext;
 	fputc ('\n', myout);
     }
   }
-#line 1102 "include.c"
-#line 1103 "include.c"
+#line 1116 "include.c"
+#line 1117 "include.c"
 
 #define INITIAL 0
 
@@ -1325,10 +1339,10 @@ YY_DECL
 		}
 
 	{
-#line 186 "include.lex"
+#line 200 "include.lex"
 
 
-#line 1332 "include.c"
+#line 1346 "include.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1404,7 +1418,7 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 188 "include.lex"
+#line 202 "include.lex"
 {
   if (incode) {
     yylineno--;
@@ -1417,7 +1431,7 @@ YY_RULE_SETUP
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 197 "include.lex"
+#line 211 "include.lex"
 {
   if (incode) {
     incode = 0;
@@ -1427,21 +1441,21 @@ YY_RULE_SETUP
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 204 "include.lex"
+#line 218 "include.lex"
 {
   echo(); // quoted character
 }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 208 "include.lex"
+#line 222 "include.lex"
 {
   scope++;
 }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 212 "include.lex"
+#line 226 "include.lex"
 {
   scope--;
   if (scope < 0) {
@@ -1458,7 +1472,7 @@ YY_RULE_SETUP
 case 6:
 /* rule 6 can match eol */
 YY_RULE_SETUP
-#line 225 "include.lex"
+#line 239 "include.lex"
 {
   // include "..."
   if (fdepend && strstr (yytext, "// nodep"))
@@ -1504,7 +1518,7 @@ YY_RULE_SETUP
 case 7:
 /* rule 7 can match eol */
 YY_RULE_SETUP
-#line 267 "include.lex"
+#line 281 "include.lex"
 {
     echo();
     hasgrid = 1;
@@ -1521,7 +1535,7 @@ YY_LINENO_REWIND_TO(yy_cp - 1);
 (yy_c_buf_p) = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 276 "include.lex"
+#line 290 "include.lex"
 {
   char * s = strstr (yytext, "dimension");
   space(s); nonspace(s);
@@ -1535,7 +1549,7 @@ YY_LINENO_REWIND_TO(yy_cp - 1);
 (yy_c_buf_p) = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 282 "include.lex"
+#line 296 "include.lex"
 {
   char * s = strstr (yytext, "BGHOSTS");
   space(s); nonspace(s);
@@ -1549,14 +1563,14 @@ YY_LINENO_REWIND_TO(yy_cp - 1);
 (yy_c_buf_p) = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 288 "include.lex"
+#line 302 "include.lex"
 {
   layers = 1;
 }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 292 "include.lex"
+#line 306 "include.lex"
 {
   // function definition
   echo();
@@ -1615,7 +1629,7 @@ YY_RULE_SETUP
 case 12:
 /* rule 12 can match eol */
 YY_RULE_SETUP
-#line 347 "include.lex"
+#line 361 "include.lex"
 {
   echo();
   if (ftags && !keywords_only)
@@ -1625,7 +1639,7 @@ YY_RULE_SETUP
 case 13:
 /* rule 13 can match eol */
 YY_RULE_SETUP
-#line 353 "include.lex"
+#line 367 "include.lex"
 {
   if (intypedef && scope == intypedef - 1) {
     echo();
@@ -1648,7 +1662,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 373 "include.lex"
+#line 387 "include.lex"
 {
   // keyword in target
   echo();
@@ -1657,12 +1671,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 379 "include.lex"
+#line 393 "include.lex"
 { echo(); if (incode && comment()) return 1; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 380 "include.lex"
+#line 394 "include.lex"
 {
   if (!incode)
     REJECT;
@@ -1672,27 +1686,27 @@ YY_RULE_SETUP
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 386 "include.lex"
+#line 400 "include.lex"
 echo();
 	YY_BREAK
 case 18:
 /* rule 18 can match eol */
 YY_RULE_SETUP
-#line 387 "include.lex"
+#line 401 "include.lex"
 echo();
 	YY_BREAK
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 388 "include.lex"
+#line 402 "include.lex"
 echo(); /* STRING_LITERAL */
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 390 "include.lex"
+#line 404 "include.lex"
 ECHO;
 	YY_BREAK
-#line 1696 "include.c"
+#line 1710 "include.c"
 			case YY_STATE_EOF(INITIAL):
 				yyterminate();
 
@@ -2684,7 +2698,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 390 "include.lex"
+#line 404 "include.lex"
 
 
 int yyerror (const char * s)

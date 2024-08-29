@@ -231,8 +231,8 @@ taylor-green-all-mach.tst: CFLAGS += -DALL_MACH=1
 
 taylor-green.tst: taylor-green-all-mach.tst
 
-#view.tst: CC = mpicc -D_MPI=4
-#view.tst: view.3D.tst
+view.tst: CC = mpicc -D_MPI=4
+view.tst: view.3D.tst
 
 view.3D.tst: CC = mpicc -D_MPI=4
 
@@ -240,9 +240,8 @@ coarsen.vtst: CFLAGS = -DMTRACE=3 -progress
 
 # Axisymmetric tests
 
-axi-tests: axiadvection.tst axi.tst 
-#axi-tests: axiadvection.tst axi.tst poiseuille-axi.tst \
-#	rising-axi.tst rising-axi-momentum.tst
+axi-tests: axiadvection.tst axi.tst poiseuille-axi.tst \
+	rising-axi.tst rising-axi-momentum.tst
 
 # 3D tests
 
@@ -490,7 +489,7 @@ gfsi.tst: gfsi.gfs
 load-balancing: balance5.tst balance6.tst balance7.tst \
 		bump2Dp.tst bump2Dp-restore.tst vortex.tst axiadvection.tst
 
-balance5.tst: CC = mpicc -D_MPI=4
+balance5.tst: CC = mpicc -D_MPI=9
 balance6.c: balance5.c
 	ln -s balance5.c balance6.c
 balance6.tst: CC = mpicc -D_MPI=17

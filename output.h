@@ -39,46 +39,43 @@ void output_field (scalar * list = all,
 		   FILE * fp = stdout,
 		   int n = N,
 		   bool linear = false,
-		   double box[2][2] = {{X0, Y0},{X0 + L0, Y0 + L0}})
+		   coord box[2] = {{X0, Y0},{X0 + L0, Y0 + L0}})
 {
   n++;
-  boundary (list);
-  int len = list_len(list);
-  double Delta = 0.999999*(box[1][0] - box[0][0])/(n - 1);
-  int ny = (box[1][1] - box[0][1])/Delta + 1;
-  double ** field = (double **) matrix_new (n, ny, len*sizeof(double));
-  for (int i = 0; i < n; i++) {
-    double x = Delta*i + box[0][0];
-    for (int j = 0; j < ny; j++) {
-      double y = Delta*j + box[0][1];
-      if (linear) {
-	int k = 0;
-	for (scalar s in list)
-	  field[i][len*j + k++] = interpolate (s, x, y);
-      }
-      else {
-	Point point = locate (x, y);
-	int k = 0;
-	for (scalar s in list)
-	  field[i][len*j + k++] = point.level >= 0 ? s[] : nodata;
-      }
-    }
+  int len = list_len (list);
+  double Delta = 0.999999*(box[1].x - box[0].x)/(n - 1);
+  int ny = (box[1].y - box[0].y)/Delta + 1;
+  double ** field = (double **) matrix_new (n, ny, len*sizeof(double)), * v = field[0];
+  for (int i = 0; i < n*ny*len; i++, v++)
+    *v = nodata;
+  coord box1[2] = {{box[0].x - Delta/2., box[0].y - Delta/2.},
+		   {box[0].x + (n - 0.5)*Delta, box[0].y + (ny - 0.5)*Delta}};
+  coord cn = {n, ny}, p;
+#if _MPI
+  v = field[0];
+  foreach_region (p, box1, cn, reduction(min:v[:n*ny*len]))
+#else
+  foreach_region (p, box1, cn)
+#endif
+  {
+    double ** alias = field; // so that qcc considers 'field' a local variable
+    int i = (p.x - box1[0].x)/(box1[1].x - box1[0].x)*cn.x;
+    int j = (p.y - box1[0].y)/(box1[1].y - box1[0].y)*cn.y;
+    int k = 0;
+    for (scalar s in list)
+      alias[i][len*j + k++] = linear ? interpolate_linear (point, s, p.x, p.y, p.z) : s[];
   }
-
-  if (pid() == 0) { // master
-@if _MPI
-    MPI_Reduce (MPI_IN_PLACE, field[0], len*n*ny, MPI_DOUBLE, MPI_MIN, 0,
-		MPI_COMM_WORLD);
-@endif
+  
+  if (pid() == 0) {
     fprintf (fp, "# 1:x 2:y");
     int i = 3;
     for (scalar s in list)
       fprintf (fp, " %d:%s", i++, s.name);
     fputc('\n', fp);
     for (int i = 0; i < n; i++) {
-      double x = Delta*i + box[0][0];
+      double x = Delta*i + box[0].x;
       for (int j = 0; j < ny; j++) {
-	double y = Delta*j + box[0][1];
+	double y = Delta*j + box[0].y;
 	//	map (x, y);
 	fprintf (fp, "%g %g", x, y);
 	int k = 0;
@@ -90,11 +87,6 @@ void output_field (scalar * list = all,
     }
     fflush (fp);
   }
-@if _MPI
-  else // slave
-    MPI_Reduce (field[0], NULL, len*n*ny, MPI_DOUBLE, MPI_MIN, 0,
-		MPI_COMM_WORLD);
-@endif
 
   matrix_free (field);
 }
@@ -128,8 +120,6 @@ The arguments and their default values are:
 trace
 void output_matrix (scalar f, FILE * fp = stdout, int n = N, bool linear = false)
 {
-  if (linear)
-    boundary ({f});
   float fn = n;
   float Delta = (float) L0/fn;
   fwrite (&fn, sizeof(float), 1, fp);
@@ -142,13 +132,7 @@ void output_matrix (scalar f, FILE * fp = stdout, int n = N, bool linear = false
     fwrite (&xp, sizeof(float), 1, fp);
     for (int j = 0; j < n; j++) {
       float yp = (float)(Delta*j + Y0 + Delta/2.), v;
-      if (linear)
-	v = interpolate (f, xp, yp);
-      else {
-	Point point = locate (xp, yp);
-	assert (point.level >= 0);
-	v = f[];
-      }
+      v = interpolate (f, xp, yp, linear = linear);
       fwrite (&v, sizeof(float), 1, fp);
     }
   }
@@ -555,7 +539,7 @@ void output_ppm (scalar f,
 		 double min = 0, double max = 0, double spread = 5,
 		 double z = 0,
 		 bool linear = false,
-		 double box[2][2] = {{X0, Y0}, {X0 + L0, Y0 + L0}},
+		 coord box[2] = {{X0, Y0}, {X0 + L0, Y0 + L0}},
 		 scalar mask = {-1},
 		 Colormap map = jet,
 		 char * opt = NULL)
@@ -570,76 +554,64 @@ void output_ppm (scalar f,
       min = avg - spread*s.stddev; max = avg + spread*s.stddev;
     }
   }
-  if (linear) {
-    scalar f = f, mask = mask;
-    if (mask.i >= 0)
-      boundary ({f, mask});
-    else
-      boundary ({f});
-  }
+  box[0].z = z, box[1].z = z;
   
-  double fn = n;
-  double Delta = (box[1][0] - box[0][0])/fn;
-  int ny = (box[1][1] - box[0][1])/Delta;
-  if (ny % 2) ny++;
-  
-  Color ** ppm = (Color **) matrix_new (ny, n, sizeof(Color));
+  coord cn = {n}, p;
+  double delta = (box[1].x - box[0].x)/n;
+  cn.y = (int)((box[1].y - box[0].y)/delta);
+  if (((int)cn.y) % 2) cn.y++;
+    
+  Color ** ppm = (Color **) matrix_new (cn.y, cn.x, sizeof(Color));
+  unsigned char * ppm0 = &ppm[0][0].r;
+  int len = 3*cn.x*cn.y;
+  memset (ppm0, 0, len*sizeof (unsigned char));
   double cmap[NCMAP][3];
   (* map) (cmap);
-  OMP_PARALLEL() {
-    OMP(omp for schedule(static))
-      for (int j = 0; j < ny; j++) {
-	double yp = Delta*j + box[0][1] + Delta/2.;
-	for (int i = 0; i < n; i++) {
-	  double xp = Delta*i + box[0][0] + Delta/2., v;
-	  if (mask.i >= 0) { // masking
-	    if (linear) {
-	      double m = interpolate (mask, xp, yp, z);
-	      if (m < 0.)
-		v = nodata;
-	      else
-		v = interpolate (f, xp, yp, z);
-	    }
-	    else {
-	      Point point = locate (xp, yp, z);
-	      if (point.level < 0 || mask[] < 0.)
-		v = nodata;
-	      else
-		v = f[];
-	    }
-	  }
-	  else if (linear)
-	    v = interpolate (f, xp, yp, z);
-	  else {
-	    Point point = locate (xp, yp, z);
-	    v = point.level >= 0 ? f[] : nodata;
-	  }
-	  ppm[ny - 1 - j][i] = colormap_color (cmap, v, min, max);
-	}
+
+#if _MPI
+  foreach_region (p, box, cn, reduction(max:ppm0[:len]))
+#else
+  foreach_region (p, box, cn)
+#endif
+  {
+    double v;
+    if (mask.i >= 0) { // masking
+      if (linear) {
+	double m = interpolate_linear (point, mask, p.x, p.y, p.z);
+	if (m < 0.)
+	  v = nodata;
+	else
+	  v = interpolate_linear (point, f, p.x, p.y, p.z);
       }
+      else {
+	if (mask[] < 0.)
+	  v = nodata;
+	else
+	  v = f[];
+      }
+    }
+    else if (linear)
+      v = interpolate_linear (point, f, p.x, p.y, p.z);
+    else
+      v = f[];
+    int i = (p.x - box[0].x)/(box[1].x - box[0].x)*cn.x;
+    int j = (p.y - box[0].y)/(box[1].y - box[0].y)*cn.y;
+    Color ** alias = ppm; // so that qcc considers ppm a local variable
+    alias[(int)cn.y - 1 - j][i] = colormap_color (cmap, v, min, max);	    
   }
   
-  if (pid() == 0) { // master
-@if _MPI
-    MPI_Reduce (MPI_IN_PLACE, ppm[0], 3*ny*n, MPI_UNSIGNED_CHAR, MPI_MAX, 0,
-		MPI_COMM_WORLD);
-@endif
+  if (pid() == 0) {
     if (file)
       fp = open_image (file, opt);
     
-    fprintf (fp, "P6\n%u %u 255\n", n, ny);
-    fwrite (((void **) ppm)[0], sizeof(Color), ny*n, fp);
+    fprintf (fp, "P6\n%g %g 255\n", cn.x, cn.y);
+    fwrite (ppm0, sizeof(unsigned char), 3*cn.x*cn.y, fp);
     
     if (file)
       close_image (file, fp);
     else
       fflush (fp);
   }
-@if _MPI
-  else // slave
-    MPI_Reduce (ppm[0], NULL, 3*ny*n, MPI_UNSIGNED_CHAR, MPI_MAX, 0,
-		MPI_COMM_WORLD);
-@endif
     
   matrix_free (ppm);
 }
@@ -682,13 +654,6 @@ void output_grd (scalar f,
 		 double box[2][2] = {{X0, Y0}, {X0 + L0, Y0 + L0}},
 		 scalar mask = {-1})
 {
-  if (linear) {
-    if (mask.i >= 0)
-      boundary ({f, mask});
-    else
-      boundary ({f});
-  }
-
   int nx = (box[1][0] - box[0][0])/Delta;
   int ny = (box[1][1] - box[0][1])/Delta;
 
@@ -706,27 +671,14 @@ void output_grd (scalar f,
     for (int i = 0; i < nx; i++) {
       double xp = Delta*i + box[0][0] + Delta/2., v;
       if (mask.i >= 0) { // masking
-	if (linear) {
-	  double m = interpolate (mask, xp, yp);
-	  if (m < 0.)
-	    v = nodata;
-	  else
-	    v = interpolate (f, xp, yp);
-	}
-	else {
-	  Point point = locate (xp, yp);
-	  if (point.level < 0 || mask[] < 0.)
-	    v = nodata;
-	  else
-	    v = f[];
-	}
+	double m = interpolate (mask, xp, yp, linear = linear);
+	if (m < 0.)
+	  v = nodata;
+	else
+	  v = interpolate (f, xp, yp, linear = linear);
       }
-      else if (linear)
-	v = interpolate (f, xp, yp);
-      else {
-	Point point = locate (xp, yp);
-	v = point.level >= 0 ? f[] : nodata;
-      }
+      else
+	v = interpolate (f, xp, yp, linear = linear);
       if (v == nodata)
 	fprintf (fp, "-9999 ");
       else

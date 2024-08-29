@@ -4,10 +4,10 @@
 int main()
 {
   init_grid (1);
+  scalar s[];
+  vector u[];
+  tensor t[];
   { interpreter_verbosity (2);
-    scalar s[];
-    vector u[];
-    tensor t[];
     reset ({u, s, t}, 0.);
     foreach() {
       dimensional (s[] == L0);

@@ -62,6 +62,7 @@ Need to know about these implicitly declared variables/macros. */
 void point;
 int BGHOSTS, o_stencil;
 double HUGE;
+void * NULL;
 
 void _Variables() {
   double x, y, z;

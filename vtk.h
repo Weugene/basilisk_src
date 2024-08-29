@@ -6,9 +6,6 @@ void output_vtk (scalar * list, int n, FILE * fp, bool linear)
 	 "DATASET STRUCTURED_GRID\n", fp);
   fprintf (fp, "DIMENSIONS %d %d 1\n", n, n);
   fprintf (fp, "POINTS %d double\n", n*n);
-
-  if (linear)
-    boundary (list);
   
   double fn = n;
   double Delta = L0/fn;
@@ -28,14 +25,8 @@ void output_vtk (scalar * list, int n, FILE * fp, bool linear)
     for (int i = 0; i < n; i++) {
       double x = Delta*i + X0 + Delta/2.;
       for (int j = 0; j < n; j++) {
-	double y = Delta*j + Y0 + Delta/2., v;
-	if (linear)
-	  v = interpolate (s, x, y);
-	else {
-	  Point point = locate (x, y);
-	  v = point.level >= 0 ? val(s) : nodata;
-	}
-	fprintf (fp, "%g\n", v);
+	double y = Delta*j + Y0 + Delta/2.;
+	fprintf (fp, "%g\n", interpolate (s, x, y, linear = linear));
       }
     }
   }

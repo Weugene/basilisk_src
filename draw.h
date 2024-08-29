@@ -546,7 +546,6 @@ static scalar compile_expression (char * expr, bool * isexpr)
     col = compile_expression (color, &expr);				\
     if (col.i < 0)							\
       return false;							\
-    boundary ({col});							\
   }									\
 									\
   double cmap[NCMAP][3];						\
@@ -1244,7 +1243,6 @@ bool squares (char * color,
     foreach()
       foreach_dimension()
         fn.x[] = (Z[1] - Z[-1])/(2.*Delta_x);
-    boundary ({fn});
   }
 #endif
   colorize_args();
@@ -1541,7 +1539,6 @@ bool isosurface (char * f,
   foreach()
     foreach_dimension()
       n.x[] = center_gradient(ff);
-  boundary ({n}); // fixme: not detected by interp() below
 
   bview * view = draw();
   glShadeModel (GL_SMOOTH);

@@ -145,6 +145,8 @@ static int count_lines (const char * s)
 
 void ast_set_child (Ast * parent, int index, Ast * child)
 {
+  if (!child)
+    return;
   if (child == ast_placeholder) {
     parent->child[index] = child;
     return;
@@ -274,67 +276,95 @@ static void update_file_line (const char * preproc, File * file)
   }  
 }
 
-static void ast_print_internal (Ast * n, FILE * fp, int sym, File * file)
+typedef struct {
+  char * s;
+  int len, size;
+} String;
+
+void string_append (void * a, ...)
+{
+  va_list ap;
+  va_start (ap, a);
+  char * s = va_arg(ap, char *);
+  while (s) {
+    String * b = a;
+    b->len += strlen (s);
+    if (b->len >= b->size) {
+      b->size = b->len + 1024;
+      char * n = realloc (b->s, b->size);
+      if (!b->s) n[0] = '\0';
+      b->s = n;
+    }
+    strcat (b->s, s);
+    s = va_arg(ap, char *);
+  }
+  va_end (ap);
+}
+
+static void str_print_internal (const Ast * n, int sym, int real, File * file,
+				void (* output) (void *, ...), void * data)
 {
   if (n == ast_placeholder) {
-    fputc ('$', fp);
+    output (data, "$", NULL);
     return;
   }
   //  ast_print_file_line (n, stderr);
   AstTerminal * t = ast_terminal (n);
   if (t) {
     if (t->before) {
-      fputs (t->before, fp);
+      output (data, t->before, NULL);
       update_file_line (t->before, file);
     }
     if (t->file) {
       int len = strlen (t->file);
       if (!file->name || strncmp (t->file, file->name, len) ||
 	  (file->name[len] != '"' && file->name[len] != '\0')) {
+	char line[20]; snprintf (line, 19, "%d", t->line);
 	if (sym == 3)
-	  fprintf (fp, "\n%s:%d: ", t->file, t->line);
+	  output (data, "\n", t->file, ":", line, " ", NULL);
 	else
-	  fprintf (fp, "\n#line %d \"%s\"\n", t->line, t->file);
+	  output (data, "\n#line ", line, " \"", t->file, "\"\n", NULL);
 	file->line = t->line;
 	file->name = t->file;      
       }
       else if (t->line != file->line) {
 	if (file->line > t->line || t->line - file->line > 10) {
+	  char line[20]; snprintf (line, 19, "%d", t->line);
 	  if (sym == 3)
-	    fprintf (fp, "\n%s:%d: ", t->file, t->line);
+	    output (data, "\n", t->file, ":", line, " ", NULL);
 	  else
-	    fprintf (fp, "\n#line %d\n", t->line);
+	    output (data, "\n#line ", line, "\n", NULL);
 	  file->line = t->line;
 	}
 	else
 	  while (file->line < t->line) {
-	    fputc ('\n', fp);
+	    output (data, "\n", NULL);
 	    file->line++;
 	  }
       }
     }
-    if (sym == 1) {
-      fputc ('|', fp);
-      fputs (symbol_name (n->sym), fp);
-      fputc ('|', fp);
-    }
+    if (sym == 1)
+      output (data, "|", symbol_name (n->sym), "|", NULL);
     else if (sym == 2) {
       if (t->value)
-	fputc ('^', fp);
+	output (data, "^", NULL);
     }
-    fputs (t->start, fp);
+    if (real && (n->sym == sym_DOUBLE || n->sym == sym_FLOAT))
+      output (data, "real", NULL);
+    else
+      output (data, t->start, NULL);
     file->line += count_lines (t->start);
     if (sym == 1)
-      fputc ('/', fp);
+      output (data, "/", NULL);
     if (t->after) {
-      fputs (t->after, fp);
+      output (data, t->after, NULL);
       file->line += count_lines (t->after);
     }
   }
   else {
     AstRoot * r = ast_root (n);
     if (r && r->before) {
-      fputs (r->before, fp);
+      output (data, r->before, NULL);
       update_file_line (r->before, file);
     }
 
@@ -344,7 +374,7 @@ static void ast_print_internal (Ast * n, FILE * fp, int sym, File * file)
     
     if (n->sym == sym_array_access && n->child[2] &&
 	ast_evaluate_constant_expression (n->child[0]) < DBL_MAX)
-      ast_print_internal (n->child[0], fp, sym, file);
+      str_print_internal (n->child[0], sym, real, file, output, data);
 
     /**
     Ignore the values of optional parameters. */
@@ -352,22 +382,46 @@ static void ast_print_internal (Ast * n, FILE * fp, int sym, File * file)
     else if (ast_schema (n, sym_parameter_declaration,
 			 3, sym_initializer))
       for (int i = 0; i < 2; i++)
-	ast_print_internal (n->child[i], fp, sym, file);
+	str_print_internal (n->child[i], sym, real, file, output, data);
     
     else
       for (Ast ** c = n->child; *c; c++)
-	ast_print_internal (*c, fp, sym, file);
+	str_print_internal (*c, sym, real, file, output, data);
     
     if (r && r->after) {
-      fputs (r->after, fp);
+      output (data, r->after, NULL);
       file->line += count_lines (r->after);
     }
   }
 }
 
-void ast_print (Ast * n, FILE * fp, int sym)
+char * ast_str_print (const Ast * n, char * s, int sym, int real)
 {
-  ast_print_internal (n, fp, sym, &(File){0});
+  String a = {0};
+  str_print_internal (n, sym, real, &(File){0}, string_append, &a);
+  if (s) {
+    str_append (s, a.s);
+    free (a.s);
+    return s;
+  }
+  return a.s;
+}
+
+static void file_append (void * a, ...)
+{
+  va_list ap;
+  va_start (ap, a);
+  char * s = va_arg(ap, char *);
+  while (s) {
+    fputs (s, a);
+    s = va_arg(ap, char *);
+  }
+  va_end (ap);
+}
+
+void ast_print (const Ast * n, FILE * fp, int sym)
+{
+  str_print_internal (n, sym, 0, &(File){0}, file_append, fp);
 }
 
 char * ast_str_append (const Ast * n, char * s)
@@ -737,6 +791,7 @@ static const char * ignore_prefixes (const char * identifier)
 Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier,
 					  const Ast * start, const Ast * end)
 {
+  if (!identifier) return NULL;
   identifier = ignore_prefixes (identifier);
   
   Ast ** d;

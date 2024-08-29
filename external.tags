@@ -25,12 +25,17 @@ call	boundary		basilisk	boundary-conditions
 call	boundary_flux		basilisk	boundary-conditions-and-stencils
 call	diagonalize		basilisk	diagonalization
 call	event			basilisk	events
+call	einstein_sum		basilisk	einstein-summation
 call	foreach			basilisk	iterators
 call	foreach_boundary	basilisk	foreach_boundary
 call	foreach_dimension	basilisk	foreach_dimension
 call	foreach_face		basilisk	foreach_face
 call	foreach_neighbor	basilisk	foreach_neighbor
+call	foreach_neighbor	basilisk	foreach_neighbor
+call	foreach_point		basilisk	foreach_point
+call	foreach_region		basilisk	foreach_region
 call	foreach_vertex		basilisk	foreach_vertex
+
 call	face			basilisk	face-and-vertex-fields
 call	mask			basilisk	complex-domains
 call	periodic		basilisk	periodic-boundaries

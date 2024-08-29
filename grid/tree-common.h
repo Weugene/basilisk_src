@@ -472,6 +472,19 @@ static scalar tree_init_vertex_scalar (scalar s, const char * name)
   return s;
 }
 
+static void tree_setup_vector (vector v)
+{
+  foreach_dimension()
+    v.x.refine = v.x.prolongation;
+}
+
+static vector tree_init_vector (vector v, const char * name)
+{
+  v = multigrid_init_vector (v, name);
+  tree_setup_vector (v);
+  return v;
+}
+
 foreach_dimension()
 static void refine_face_x (Point point, scalar s)
 {
@@ -583,7 +596,7 @@ void refine_face_solenoidal (Point point, scalar s)
 #endif // dimension > 1
 }
 
-vector tree_init_face_vector (vector v, const char * name)
+static vector tree_init_face_vector (vector v, const char * name)
 {
   v = cartesian_init_face_vector (v, name);
   foreach_dimension()
@@ -593,6 +606,14 @@ vector tree_init_face_vector (vector v, const char * name)
   foreach_dimension()
     v.x.prolongation = refine_face_x;
   return v;
+}
+
+static tensor tree_init_tensor (tensor t, const char * name)
+{
+  t = multigrid_init_tensor (t, name);
+  foreach_dimension()
+    tree_setup_vector (t.x);
+  return t;
 }
 
 trace
@@ -637,7 +658,7 @@ static void tree_boundary_level (scalar * list, int l)
 	  is_refined(neighbor(0,-1)) || is_refined(neighbor(-1,-1))) {
 	// corner
 	for (scalar s in vlist)
-	  s[] = is_vertex (child(0,0,0)) ? fine(s) : nodata;
+	  s[] = is_vertex (child(0)) ? fine(s) : nodata;
       }
       else
 	foreach_dimension()
@@ -814,7 +835,9 @@ void tree_methods()
   multigrid_methods();
   init_scalar        = tree_init_scalar;
   init_vertex_scalar = tree_init_vertex_scalar;
+  init_vector        = tree_init_vector;
   init_face_vector   = tree_init_face_vector;
+  init_tensor        = tree_init_tensor;
   boundary_level     = tree_boundary_level;
   boundary_face      = halo_face;
   restriction        = tree_restriction;

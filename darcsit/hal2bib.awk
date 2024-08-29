@@ -3,8 +3,8 @@ BEGIN{ FS=", " }
 /@hal{.*,.*}/{
     gsub ("}", "", $2);
     gsub (".*{", "", $1);
-    system ("wget -q -O - https://hal.archives-ouvertes.fr/" $2 "/bibtex | " \
-	    "sed 's/^\\(@.*\\){.*,/\\1{" $1 ",/g'");
+    system ("bash $BASILISK/darcsit/gethal.sh " $2 " | " \
+	    "sed 's/^\\(@[^{]*\\){[^,]*,/\\1{" $1 ",/g'");
     next;
 }
 

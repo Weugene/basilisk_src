@@ -11,8 +11,8 @@ ast/interpreter/overload.h:35: malloc (size): 0xaddress
 test14.c:13: array_append (0xaddress, 0xaddress, 5)
 /common.h:396: a->len + size >= a->max: 1
 /common.h:397: max (5, 4096  + [/src/common.h:397: '4096'])
-ast/interpreter/overload.h:469: 'a > b': [/src/common.h:397: '4096'] = [0]
-ast/interpreter/overload.h:469: a > b ? a : b: 4096  + [/src/common.h:397: '4096']
+ast/interpreter/overload.h:465: 'a > b': [/src/common.h:397: '4096'] = [0]
+ast/interpreter/overload.h:465: a > b ? a : b: 4096  + [/src/common.h:397: '4096']
 /common.h:397: a->max += max (size, 4096): 4096  + [/src/common.h:384: 'a->len = 0']
 /common.h:398: prealloc (0xaddress, 4096  + [/src/common.h:384: 'a->len = 0'])
 ast/interpreter/overload.h:45: realloc (0xaddress, 4096  + [/src/common.h:384: 'a->len = 0'])

@@ -2,7 +2,7 @@
 #line 9 "dimension-tests/test9.c"
 1
 
-#line 132 "interpreter.c"
+#line 8 "types.c"
 ast_long
 size: 17, flags: 2, pointer: 0, scope: 2, value: 1  + [dimension-tests/test9.c:9: '1']
 ===================
@@ -10,7 +10,7 @@ size: 17, flags: 2, pointer: 0, scope: 2, value: 1  + [dimension-tests/test9.c:9
 #line 11 "dimension-tests/test9.c"
 1
 
-#line 132 "interpreter.c"
+#line 8 "types.c"
 ast_long
 size: 17, flags: 2, pointer: 0, scope: 2, value: 1  + [dimension-tests/test9.c:11: '1']
 ===================

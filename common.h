@@ -692,7 +692,7 @@ int mpi_all_reduce0 (void *sendbuf, void *recvbuf, int count,
 @
 @def mpi_all_reduce_array(v,type,op,elem) {
   prof_start ("mpi_all_reduce");
-  type global[elem], tmp[elem];
+  type * global = malloc ((elem)*sizeof(type)), * tmp = malloc ((elem)*sizeof(type));
   for (int i = 0; i < elem; i++)
     tmp[i] = (v)[i];
   MPI_Datatype datatype;
@@ -700,6 +700,7 @@ int mpi_all_reduce0 (void *sendbuf, void *recvbuf, int count,
   else if (!strcmp(#type, "int")) datatype = MPI_INT;
   else if (!strcmp(#type, "long")) datatype = MPI_LONG;
   else if (!strcmp(#type, "bool")) datatype = MPI_C_BOOL;
+  else if (!strcmp(#type, "unsigned char")) datatype = MPI_UNSIGNED_CHAR;
   else {
     fprintf (stderr, "unknown reduction type '%s'\n", #type);
     fflush (stderr);
@@ -708,6 +709,7 @@ int mpi_all_reduce0 (void *sendbuf, void *recvbuf, int count,
   mpi_all_reduce0 (tmp, global, elem, datatype, op, MPI_COMM_WORLD);
   for (int i = 0; i < elem; i++)
     (v)[i] = global[i];
+  free (global), free (tmp);
   prof_stop();
 }
 @
@@ -1162,8 +1164,9 @@ scalar * baseblock = NULL; // base block fields
 scalar (* init_scalar)        (scalar, const char *);
 scalar (* init_vertex_scalar) (scalar, const char *);
 vector (* init_vector)        (vector, const char *);
-tensor (* init_tensor)        (tensor, const char *);
 vector (* init_face_vector)   (vector, const char *);
+tensor (* init_tensor)        (tensor, const char *);
+void   (* scalar_clone)       (scalar, scalar);
 
 #define vector(x) (*((vector *)&(x)))
 
@@ -1441,6 +1444,16 @@ void display (const char * commands, bool overwrite = false)
 
 #define display_control(val, ...)
 
+typedef struct {
+  double x;
+#if dimension > 1
+  double y;
+#endif
+#if dimension > 2
+  double z;
+#endif
+} _coord;
+
 #if LAYERS
 # include "grid/layers.h"
 #endif
@@ -1450,3 +1463,19 @@ void display (const char * commands, bool overwrite = false)
 #define dirichlet(expr)                 _dirichlet(expr, point, neighbor, _s, data)
 #define dirichlet_face(expr)            _dirichlet_face(expr, point, neighbor, _s, data)
 #define neumann(expr)                   _neumann(expr, point, neighbor, _s, data)
+
+typedef struct {
+  coord x, y, z;
+} mat3;
+
+OMP(omp declare reduction (+ : mat3 :
+			   omp_out.x.x += omp_in.x.x,
+			   omp_out.x.y += omp_in.x.y,
+			   omp_out.x.z += omp_in.x.z,
+			   omp_out.y.x += omp_in.y.x,
+			   omp_out.y.y += omp_in.y.y,
+			   omp_out.y.z += omp_in.y.z,
+			   omp_out.z.x += omp_in.z.x,
+			   omp_out.z.y += omp_in.z.y,
+			   omp_out.z.z += omp_in.z.z
+			   ))

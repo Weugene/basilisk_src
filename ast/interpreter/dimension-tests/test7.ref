@@ -2,7 +2,7 @@
 #line 13 "dimension-tests/test7.c"
 minmod2 (a, b, c)
 
-#line 137 "interpreter.c"
+#line 13 "types.c"
 ast_double
 size: 17, flags: 1, pointer: 0, scope: 4, value: 0 (unset)  + [/src/utils.h:227: '0.']
 ===================
@@ -10,7 +10,7 @@ size: 17, flags: 1, pointer: 0, scope: 4, value: 0 (unset)  + [/src/utils.h:227:
 #line 19 "dimension-tests/test7.c"
 minmod2 (a, b, c)
 
-#line 137 "interpreter.c"
+#line 13 "types.c"
 ast_double
 size: 17, flags: 1, pointer: 0, scope: 4, value: 0 (unset)  + [/src/utils.h:227: '0.']
 ===================

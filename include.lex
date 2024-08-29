@@ -65,15 +65,29 @@
     _stack[++stack] = f;
     return f;    
   }
-  
+
+  static int strcmps (char * s1, char * s2) {
+    while (*s1 != '\0' && *s2 != '\0') {
+      if (*s1 != *s2)
+	return 1;
+      if (*s1 == '/') {
+	while (*s1 == '/') s1++;
+	while (*s2 == '/') s2++;
+      }
+      else
+	s1++, s2++;
+    }
+    return !(*s1 == '\0' && *s2 == '\0');
+  }
+
   static void push_once (char * s) {
     static char * _processed[100];
     static int processed = 0;
     int i;
     char * s1 = strip_path (s);
     for (i = 0; i < processed; i++)
-      if (!strcmp (s1, strip_path (_processed[i])))
-	return; // already processed
+      if (!strcmps (s1, strip_path (_processed[i])))
+	return; // already processed    
     assert (processed < 100);
     _processed[processed++] = push (s);
   }

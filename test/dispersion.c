@@ -74,17 +74,16 @@ event logfile (i++)
     pe += Delta*G*sq(h[] - h0)/2.;
   }
 #endif
-  
-  Point point = locate (L0/2.);
+
 #if ML
   double H = 0.;
-  foreach_layer()
-    H += h[];
-  double dh = (H - h0)/h0;
+  foreach_point (L0/2.)
+    foreach_layer()
+      H += h[];
 #else
-  double H = h[];
-  double dh = (H - h0)/h0;
+  double H = interpolate (h, L0/2., linear = false);
 #endif
+  double dh = (H - h0)/h0;
 #if 0
   static FILE * fp = fopen ("timeseries", "w");
   char name[80];
@@ -132,11 +131,12 @@ event profile (t = 9.25*2.*pi/sqrt(tanh(h0)))
     char name[80];
     sprintf (name, "profile-%g", h0);
     FILE * fp = fopen (name, "w");
-    Point point = locate (L0/2.);
-    double zl = zb[];
-    foreach_layer() {
-      fprintf (fp, "%g %g %g\n", zl + h[]/2., w[], phi[]);
-      zl += h[];
+    foreach_point (L0/2.) {
+      double zl = zb[];
+      foreach_layer() {
+	fprintf (fp, "%g %g %g\n", zl + h[]/2., w[], phi[]);
+	zl += h[];
+      }
     }
     fclose (fp);
   }

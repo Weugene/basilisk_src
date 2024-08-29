@@ -9,6 +9,7 @@ Note that only the documented test cases appear in the list below
 ## Advection
 
 * [Pure rotation of a smooth tracer field](rotation.c)
+* [Time-reversed advection in a vortex](advection.c)
 
 ## Systems of conservation laws
 
@@ -61,6 +62,8 @@ Note that only the documented test cases appear in the list below
 * [Breaking Stokes wave](stokes.c)
 * [Galilean invariance](galilean_invariance.c)
 * [Typical (1D) tsunami wave](tsunami.c)
+* [3D meniscus](meniscus3D.c)
+* [Dispersion relation of gravito-capillary waves](dispersion_gravitocap.c)
 
 ## Coriolis
 
@@ -82,6 +85,7 @@ Note that only the documented test cases appear in the list below
 * [Fractions in marginal cases](fractions2.c)
 * [Computation of a levelset field from a contour](basilisk.c)
 * [Time-reversed VOF advection in a vortex](reversed.c)
+* [Preventing coalescence of VOF tracers](no-coalescence.c)
 
 ## Surface tension
 
@@ -206,6 +210,7 @@ Note that only the documented test cases appear in the list below
 * [Convergence of the Runge--Kutta solvers](runge-kutta.c)
 * [Segment traversal](segment.c)
 * [Redistancing of a perturbed distance field](redistance-ellipse.c)
+* [Einstein summation](einstein_sum.c)
 
 ## Unmaintained
 

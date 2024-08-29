@@ -53,9 +53,9 @@ qcc -Wall -O2 program.c -o program -L$BASILISK/gl -lglutils -lfb_tiny -lm
 We include the various helper functions defined either by the system
 or by the Basilisk libraries in gl/. */
 
-#include "gl/framebuffer.h"
-#include "gl/trackball.h"
-#include "gl/utils.h"
+#include <gl/framebuffer.h>
+#include <gl/trackball.h>
+#include <gl/utils.h>
 #pragma autolink -L$BASILISK/gl -lglutils $OPENGLIBS
 
 #include "utils.h"

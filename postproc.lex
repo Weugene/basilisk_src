@@ -34,11 +34,61 @@ static char * autolink = NULL;
 
 #define nonspace(s) { while (strchr(" \t\v\n\f", *s)) s++; }
 #define space(s) { while (!strchr(" \t\v\n\f", *s)) s++; }
+
+static int input0 (FILE * yyin)
+{
+  static int buf[2] = {0}, n = 0;  
+  int c;
+  if (n > 0)
+    c = buf[0], buf[0] = buf[1], n--;
+  else
+    c = fgetc (yyin);
+  switch (c) {
+
+  case EOF: return c;
+    
+  case '\n': line++; return c;
+
+  case '_': // skip "code strings" i.e. _("...")
+    if (n == 0) {
+      int d = fgetc (yyin); buf[0] = d;
+      if (d == '(') {
+	d = fgetc (yyin); buf[1] = d;
+	if (d == '"') {
+	  fputc (d, yyout);
+	  d = fgetc (yyin); 
+	  while (d != EOF && d != '"') {
+	    fputc (d, yyout);
+	    if (d == '\n') line++;
+	    else if (d == '\\') {
+	      d = fgetc (yyin); if (d == '\n') line++;
+	      fputc (d, yyout);
+	    }
+	    d = fgetc (yyin);
+	  }
+	  if (d == '"') {
+	    fputc (d, yyout);
+	    d = fgetc (yyin); if (d == '\n') line++;
+	    if (d == ')')
+	      d = fgetc (yyin); if (d == '\n') line++;
+	  }
+	  c = d;
+	}
+	else
+	  n = 2;
+      }
+      else
+	n = 1;
+    }
+    break;
+
+  }
+  return c;
+}
  
 #define YY_INPUT(buf,result,max_size)			      \
   {							      \
-    int c = fgetc(yyin);				      \
-    if (c == '\n') { line++; }				      \
+    int c = input0 (yyin);				      \
     result = (c == EOF) ? YY_NULL : (buf[0] = c, 1);	      \
   }
   
@@ -121,6 +171,10 @@ S_LINENO {
   fputs (nolineno ? "0" : "__LINE__", yyout);
 }
 	   
+S__VA_ARGS__ {
+  fputs ("__VA_ARGS__", yyout);
+}
+
 {STRING}+	{ ECHO; }
 \n            {
   if (indef)

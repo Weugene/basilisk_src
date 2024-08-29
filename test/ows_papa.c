@@ -187,7 +187,11 @@ int main()
 
   These were derived from observations. */
   
-  #define GOTM_CASES "https://github.com/gotm-model/cases/raw/master/"
+  // This seems to be unreliable
+  // #define GOTM_CASES "https://github.com/gotm-model/cases/raw/master/"
+  // so we use a mirror here
+  
+  #define GOTM_CASES "http://basilisk.fr/src/test/"
 
   system ("test -f sst.dat || ( "
 	  "wget -q " GOTM_CASES "ows_papa/heatflux.dat && "

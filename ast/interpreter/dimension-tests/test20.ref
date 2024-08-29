@@ -1,14 +1,8 @@
 16 constraints, 16 unknowns
 Dimensions of constants
   [1]
-    ast/interpreter/overload.h:168: 's[] = 0.'
-    ast/interpreter/overload.h:168: 't.x.x[] = 0.'
-    ast/interpreter/overload.h:168: 't.x.y[] = 0.'
-    ast/interpreter/overload.h:168: 't.y.x[] = 0.'
-    ast/interpreter/overload.h:168: 't.y.y[] = 0.'
-    ast/interpreter/overload.h:168: 'u.x[] = 0.'
-    ast/interpreter/overload.h:168: 'u.y[] = 0.'
-    /src/common.h:854: 'X0 = 0.'
-    /src/common.h:854: 'Y0 = 0.'
-    /src/common.h:854: 'Z0 = 0.'
-    /src/common.h:856: 'L0 = 1. [1]'
+    ast/interpreter/overload.h:168: '0.'
+    /src/common.h:856: 'X0 = 0.'
+    /src/common.h:856: 'Y0 = 0.'
+    /src/common.h:856: 'Z0 = 0.'
+    /src/common.h:858: 'L0 = 1. [1]'

@@ -37,7 +37,7 @@ void vertical_diffusion (Point point, scalar h, scalar s, double dt, double D,
   The *rhs* of the tridiagonal system is $h_l s_l$. */
       
   foreach_layer()
-    rhs[_layer] = s[]*h[];
+    rhs[point.l] = s[]*h[];
 
   /**
   The lower, principal and upper diagonals $a$, $b$ and $c$ are given by

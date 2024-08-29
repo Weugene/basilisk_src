@@ -158,25 +158,25 @@ event dumps (i += 10) {
   coord numax = maxpos (nu);
   fprintf (stderr, "numax: %g %g %g\n", numax.x, numax.y, numax.z);
   numax = maxpos (p);
-#if 0  
-  Point point = locate (numax.x, numax.y, numax.z);
-  fprintf (stderr, "pmax: %g %g %g %g %g\n", numax.x, numax.y, numax.z,
-	   p[], cs[]);
+#if 0
+  foreach_point (numax.x, numax.y, numax.z)
+    fprintf (stderr, "pmax: %g %g %g %g %g\n", numax.x, numax.y, numax.z,
+	     p[], cs[]);
 #endif
   numax = maxpos (du);
   {
-    Point point = locate (numax.x, numax.y, numax.z);
     fprintf (stderr, "dumax: %g %g %g\n", numax.x, numax.y, numax.z);
     FILE * fp = fopen ("dumax", "w");
-    foreach_neighbor(1) {
-      fprintf (fp, "fs %g %g %g %g\n", x - Delta/2., y, z, fs.x[]);
-      fprintf (fp, "fs %g %g %g %g\n", x, y - Delta/2., z, fs.y[]);
-      fprintf (fp, "fs %g %g %g %g\n", x, y, z - Delta/2., fs.z[]);
-      fprintf (fp, "fs %g %g %g %g\n", x + Delta/2., y, z, fs.x[1]);
-      fprintf (fp, "fs %g %g %g %g\n", x, y + Delta/2., z, fs.y[0,1]);
-      fprintf (fp, "fs %g %g %g %g\n", x, y, z + Delta/2., fs.z[0,0,1]);
-      fprintf (fp, "%g %g %g %g\n", x, y, z, cs[]);
-    }
+    foreach_point (numax.x, numax.y, numax.z)
+      foreach_neighbor(1) {
+        fprintf (fp, "fs %g %g %g %g\n", x - Delta/2., y, z, fs.x[]);
+	fprintf (fp, "fs %g %g %g %g\n", x, y - Delta/2., z, fs.y[]);
+	fprintf (fp, "fs %g %g %g %g\n", x, y, z - Delta/2., fs.z[]);
+	fprintf (fp, "fs %g %g %g %g\n", x + Delta/2., y, z, fs.x[1]);
+	fprintf (fp, "fs %g %g %g %g\n", x, y + Delta/2., z, fs.y[0,1]);
+	fprintf (fp, "fs %g %g %g %g\n", x, y, z + Delta/2., fs.z[0,0,1]);
+	fprintf (fp, "%g %g %g %g\n", x, y, z, cs[]);
+      }
     fclose (fp);
   }
 #endif
