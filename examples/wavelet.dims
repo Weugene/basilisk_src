@@ -1,0 +1,9 @@
+28 constraints, 28 unknowns
+[0]  /src/grid/multigrid-common.h:28: 'sum = 0.'
+[0]  /src/common.h:854: 'X0 = 0.'
+[0]  /src/common.h:854: 'Y0 = 0.'
+[0]  /src/common.h:854: 'Z0 = 0.'
+[0]  wavelet.c:32: '2'
+[0]  wavelet.c:50: '0'
+[0]  wavelet.c:63: '1e-12'
+[0]  wavelet.c:100: '1'

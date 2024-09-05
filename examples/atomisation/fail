@@ -1,0 +1,4 @@
+qcc -autolink -g -Wall -Wno-unused-function -pipe -O2  -o atomisation/atomisation atomisation.c  -lm
+ld: library not found for -lfb_glx
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+make: *** [atomisation.s] Error 1
