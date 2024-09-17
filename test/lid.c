@@ -27,8 +27,7 @@ int main()
 #if MAC
   nu = 1e-3;
 #else
-  const face vector muc[] = {1e-3,1e-3};
-  mu = muc;
+  mu[] = {1e-3,1e-3};
 #endif
   // maximum timestep
   DT = 0.1 [0,1];

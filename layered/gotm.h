@@ -19,11 +19,11 @@ provided as surface fields by the calling solver. They are zero by
 default. */
 
 // surface wind stress (eg. in Pa or N/m^2)
-(const) vector airsea_tau      = zerof;
+(const) vector airsea_tau[] = {0.};
 // surface heat flux (eg. in W/m^2)
-(const) scalar airsea_heat_flux = zeroc;
+(const) scalar airsea_heat_flux[] = 0.;
 // surface short-wave radiation flux (eg. in W/m^2)
-(const) scalar airsea_swr_flux  = zeroc;
+(const) scalar airsea_swr_flux[] = 0.;
 
 /**
 ## Implementation

@@ -55,9 +55,9 @@ int main() {
   f.sigma = 1.;
 #endif
   TOLERANCE = 1e-6 [*];
-  const face vector muc[] = {0.0182571749236, 0.0182571749236};
-  mu = muc;
+  mu[] = {0.0182571749236, 0.0182571749236};
 
+  
   /**
   We vary the resolution to check for convergence. */
 

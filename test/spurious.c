@@ -81,8 +81,7 @@ event init (i = 0) {
   /**
   We set the constant viscosity field... */
 
-  const face vector muc[] = {MU,MU};
-  mu = muc;
+  mu[] = {MU,MU};
 
   /**
   ... open a new file to store the evolution of the amplitude of

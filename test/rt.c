@@ -24,8 +24,7 @@ int main() {
 #if REDUCED
   G.y = -9.81;
 #else
-  const face vector g[] = {0,-9.81};
-  a = g;
+  a[] = {0,-9.81};
 #endif
   DT = 5e-3;
   TOLERANCE = 1e-6;

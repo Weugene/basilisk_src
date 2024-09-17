@@ -51,8 +51,7 @@ int main()
   
   a = av;
   DT = 0.03;
-  const face vector muc[] = {2e-4,2e-4};
-  mu = muc;
+  mu[] = {2e-4,2e-4};
 
   /**
   This is required due to a problem with the automatic increase in the

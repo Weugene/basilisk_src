@@ -19,7 +19,7 @@ respecting the C99 grammar (with added macros).
 By default grammar checks are turned off. */
 
 #if 0
-# define CHECK(x, recursive) ast_check_grammar(x, recursive)
+# define CHECK(x, recursive) ast_check_grammar(x, recursive, true)
 #else
 # define CHECK(x, recursive) ((void) x)
 #endif
@@ -2091,6 +2091,30 @@ void compound_prepend (Ast * compound, Ast * n)
     ast_block_list_prepend (list, sym_block_item, n);
 }
   
+static char * append_initializer (char * init, Ast * initializer, const char * typename)
+{
+  if (!strcmp (typename, "vector")) {
+    str_append (init, "(double[])");
+    Ast * list = ast_schema (initializer, sym_initializer,
+			     1, sym_initializer_list);
+    if (list) {
+      char * initialize = ast_str_append (list, NULL);
+      str_append (init, "{", initialize);
+      free (initialize);
+      int nr = 3;
+      foreach_item (list, 2, item) nr--;
+      while (nr--)
+	str_append (init, ",0.");
+      str_append (init, "}");
+      return init;
+    }
+  }
+  char * initialize = ast_str_append (initializer, NULL);
+  str_append (init, initialize);
+  free (initialize);
+  return init;
+}
+
 /**
 # First pass: Global boundaries and stencils */
 
@@ -2111,16 +2135,67 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
     break;
   }
 
-  /**
-  ## Local boundary conditions */
-    
   case sym_array_access: {
 
     Ast * assign = ast_ancestor (n, 3), * scope;
     if (assign->sym == sym_assignment_expression &&
 	(scope = function_scope (n, stack))) {
-      const char * typename =
-	ast_typedef_name (ast_expression_type (n->child[0], stack, false));
+      Ast * type = ast_expression_type (n->child[0], stack, false);
+      const char * typename = ast_typedef_name (type);
+      
+      /**
+      ## Constant fields */
+
+      if (typename && !ast_child (n, sym_expression) && ast_is_field (typename)) {
+	AstTerminal * field = ast_left_terminal (n);
+	if (!ast_schema (ast_parent (type, sym_declaration), sym_declaration,
+			 0, sym_declaration_specifiers,
+			 0, sym_type_qualifier,
+			 0, sym_MAYBECONST) &&
+	    !ast_schema (ast_parent (type, sym_parameter_declaration), sym_parameter_declaration,
+			 0, sym_declaration_specifiers,
+			 0, sym_type_qualifier,
+			 0, sym_MAYBECONST)) {
+	  fprintf (stderr,
+		   "%s:%d: error: constant field '%s' must be declared (const)\n",
+		   field->file, field->line, field->start);
+	  exit (1);
+	}
+	
+	char * func = strdup (typename);
+	for (char * s = func; *s != '\0'; s++)
+	  if (*s == ' ')
+	    *s = '_';
+	
+	const char * name = field->start;
+	if (strchr (typename, ' '))
+	  typename = strchr (typename, ' ') + 1;
+
+	const char * const_func = strchr (func, '_');
+	const_func = const_func ? const_func + 1 : func;
+	TranslateData * d = data;	
+	
+	char * src = NULL, ind[10];
+	snprintf (ind, 9, "%d", d->constants_index);
+	d->constants_index += !strcmp (typename, "scalar") ? 1 : d->dimension;
+	str_append (src, "a = new_const_",
+		    const_func, "(\"", name, "\",",
+		    ind, ",");
+	src = append_initializer (src, assign->child[2], typename);
+	str_append (src, ");");
+       	Ast * expr = ast_parse_expression (src, ast_get_root (n));
+	free (src);
+	ast_replace_child (assign, 2, ast_find (expr, sym_assignment_expression,
+						2, sym_assignment_expression));
+	ast_destroy (expr);
+	ast_set_child (n->parent->parent, 0, n->child[0]);
+	ast_destroy (n);
+	break;
+      }
+      
+      /**
+      ## Local boundary conditions */
+    
       Ast * member = NULL;
       if ((typename &&
 	   (!strcmp (typename, "scalar") ||
@@ -2328,30 +2403,6 @@ static Ast * higher_dimension (Ast * n)
 		     ast_terminal_new (n, sym_IDENTIFIER, s));
 }
 
-static char * append_initializer (char * init, Ast * initializer, const char * typename)
-{
-  if (!strcmp (typename, "vector")) {
-    str_append (init, "(double[])");
-    Ast * list = ast_schema (initializer, sym_initializer,
-			     1, sym_initializer_list);
-    if (list) {
-      char * initialize = ast_str_append (list, NULL);
-      str_append (init, "{", initialize);
-      free (initialize);
-      int nr = 3;
-      foreach_item (list, 2, item) nr--;
-      while (nr--)
-	str_append (init, ",0.");
-      str_append (init, "}");
-      return init;
-    }
-  }
-  char * initialize = ast_str_append (initializer, NULL);
-  str_append (init, initialize);
-  free (initialize);
-  return init;
-}
-
 /**
 ## Attribute declaration */
 
@@ -2477,8 +2528,7 @@ function call `val(s,i,j,0)`. */
 
 void ast_stencil_access (Ast * n, Stack * stack, int dimension)
 {
-  const char * typename =
-    ast_typedef_name (ast_expression_type (n->child[0], stack, false));
+  const char * typename = ast_typedef_name (ast_expression_type (n->child[0], stack, false));
   Ast * member, * foreach = NULL;
   if (typename &&
       (!strcmp (typename, "scalar") ||
@@ -2553,7 +2603,7 @@ static void translate (Ast * n, Stack * stack, void * data)
   typedef struct {
     char * target, * replacement;
   } Replacement;
-  
+
   switch (n->sym) {
 
   /**
@@ -2815,7 +2865,11 @@ static void translate (Ast * n, Stack * stack, void * data)
 	if (ast_schema (declaration, sym_declaration,
 			0, sym_declaration_specifiers,
 			0, sym_type_qualifier,
-			0, sym_CONST)) {
+			0, sym_CONST) ||
+	    ast_schema (declaration, sym_declaration,
+			0, sym_declaration_specifiers,
+			0, sym_type_qualifier,
+			0, sym_MAYBECONST)) {
 	  const char * const_func = strchr (func, '_');
 	  const_func = const_func ? const_func + 1 : func;
 	  TranslateData * d = data;

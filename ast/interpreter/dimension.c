@@ -1275,7 +1275,7 @@ static bool system_solve (System * s)
 static
 Value * dimension_run (Ast * n, Stack * stack)
 {
-  if (!n)
+  if (!n || n == ast_placeholder)
     return NULL;
 
   switch (n->sym) {

@@ -18,7 +18,7 @@ is treated implicitly and does not restrict the timestep.
 The default surface tension coefficient $\sigma$ is constant and equal to
 unity. */
 
-(const) scalar sigma = unity;
+(const) scalar sigma[] = 1.;
 
 /**
 ## Laplace pressure

@@ -1252,7 +1252,7 @@ double timer_elapsed (timer t)
 	  (tvend.tv_usec - t.tv.tv_usec)/1e6);
 }
 
-// Constant fields // fixme: should be removed
+// Constant fields
 
 const face vector zerof[] = {0.,0.,0.};
 const face vector unityf[] = {1.,1.,1.};
@@ -1261,10 +1261,10 @@ const scalar zeroc[] = 0.;
 
 // Metric
 
-const face vector unityf0[] = {1.[0],1.[0],1.[0]};
-const scalar unity0[] = 1.[0];
-(const) face vector fm = unityf0; // fixme: should just be fm = {1,1,1};
-(const) scalar cm = unity0; // fixme: should just be cm = 1.;
+(const) face vector fm[] = {1.[0],1.[0],1.[0]};
+(const) scalar cm[] = 1.[0];
+
+
 
 // Embedded boundaries
 // these macros are overloaded in embed.h

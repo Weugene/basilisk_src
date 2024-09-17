@@ -408,11 +408,11 @@ mgstats poisson (scalar a, scalar b,
   provide $\alpha$ and $\beta$ as constant fields. */
 
   if (alpha.x.i < 0)
-    alpha = unityf;
-  if (lambda.i < 0) {
-    const scalar zeroc[] = 0.; // fixme
-    lambda = zeroc;
-  }
+    alpha[] = {1.,1.,1.};
+  if (lambda.i < 0)
+    lambda[] = 0.;
+
+
 
   /**
   We need $\alpha$ and $\lambda$ on all levels of the grid. */
